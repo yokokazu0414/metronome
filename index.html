@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Metronome — iOS Audio Unlock (Clean Test)</title>
+<title>Metronome — iOS Audio Unlock (Patched)</title>
 <style>
   body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0e1116;color:#e6edf3}
   .wrap{max-width:760px;margin:40px auto;padding:24px}
@@ -15,16 +15,17 @@
   button{border-radius:10px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;padding:10px 12px;font-size:16px;cursor:pointer}
   button.primary{background:#1f6feb;border-color:#1f6feb}
   .ok{background:#10291a;border:1px solid #1f883d;padding:8px 12px;border-radius:10px}
+  .label{font-size:12px;opacity:.8;margin-bottom:4px}
 </style>
 </head>
 <body>
 <div id="unlock" class="unlock"><button id="unlockBtn" type="button">Audioを有効化（タップ）</button></div>
 <div class="wrap">
-  <h1>iOS オーディオ解放 — 最小テスト版（クリーン）</h1>
+  <h1>iOS オーディオ解放 — 最小テスト版（パッチ適用）</h1>
   <div class="card">
     <div id="status" class="ok">状態: 未解放</div>
     <div style="margin:8px 0">
-      <div style="font-size:12px;opacity:.8;margin-bottom:4px">オーディオ出力レベル</div>
+      <div class="label">オーディオ出力レベル</div>
       <div id="meter" style="height:10px;background:#222;border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:0;background:#2ea043"></i></div>
     </div>
     <div class="row">
@@ -47,9 +48,9 @@
     if (!ctx){
       try { ctx = new AC({latencyHint:'interactive'}); }
       catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
-      master = ctx.createGain(); master.gain.value = 0.8; master.connect(ctx.destination);
+      master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
       analyser = ctx.createAnalyser(); analyser.fftSize = 1024; master.connect(analyser);
-      // 無音バッファで初期鳴動（iOS安定化）
+      // 無音1サンプルで起動
       const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0);
     }
   }
@@ -57,23 +58,21 @@
   async function unlockOnce(e){
     if (e && e.preventDefault) e.preventDefault();
     ensureAudio(); if (!ctx) return;
-    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(_){}
-    // resume後に無音をもう一度
-    try { const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0); } catch(_){}
-    if (ctx.state === 'running') {
+    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(_){ }
+    try { const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0);} catch(_){ }
+    if (ctx.state === 'running'){
       document.getElementById('unlock').classList.add('hidden');
-      ['touchstart','pointerdown','click'].forEach(ev => window.removeEventListener(ev, unlockOnce, true));
+      ['touchstart','pointerdown','click'].forEach(ev=> window.removeEventListener(ev, unlockOnce, true));
       log('解放済み（running）');
     } else {
       log('解放できず（'+ctx.state+'）');
     }
   }
   document.getElementById('unlockBtn').addEventListener('click', unlockOnce, {once:true});
-  // どこでもタップで保険
   window.addEventListener('touchstart', unlockOnce, {capture:true, passive:false});
   window.addEventListener('pointerdown', unlockOnce, {capture:true});
 
-  // メーターループ
+  // レベルメーター
   (function meterLoop(){
     if (analyser){
       const buf = new Uint8Array(analyser.fftSize);
@@ -85,15 +84,15 @@
     requestAnimationFrame(meterLoop);
   })();
 
-  // ===== テスト音 =====
+  // ===== WebAudio: 自前ビープ =====
   function beep(){
     if (!ctx || ctx.state !== 'running'){ log('AudioContextが未実行'); return; }
-    const dur = 0.4; const len = Math.floor(ctx.sampleRate * dur);
+    const dur = 0.5; const len = Math.floor(ctx.sampleRate * dur);
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i=0;i<len;i++){
       const t = i/ctx.sampleRate; const env = Math.exp(-5*t);
-      data[i] = Math.sin(2*Math.PI*1000*t) * env; // 1kHz ビープ
+      data[i] = Math.sin(2*Math.PI*1000*t) * env; // 1kHz
     }
     const src = ctx.createBufferSource(); src.buffer = buf;
     const g = ctx.createGain(); g.gain.value = 1.0; src.connect(g); g.connect(master); src.start();
@@ -101,7 +100,7 @@
   document.getElementById('selftest').addEventListener('click', ()=>{ log('Self Test 実行'); beep(); });
   document.getElementById('selftest').addEventListener('touchend', e=>{ e.preventDefault(); log('Self Test 実行(touch)'); beep(); }, {passive:false});
 
-  // 長押し連続トーン
+  // ===== 長押し連続トーン =====
   function startHold(){ if (!ctx || ctx.state!=='running' || osc) return; osc = ctx.createOscillator(); const g = ctx.createGain(); g.gain.value = 0.6; osc.frequency.value = 440; osc.connect(g); g.connect(master); osc.start(); log('連続トーン開始'); }
   function stopHold(){ if (osc){ osc.stop(); osc.disconnect(); osc=null; log('連続トーン停止'); } }
   const holdBtn = document.getElementById('holdtest');
@@ -110,15 +109,37 @@
   holdBtn.addEventListener('touchstart', e=>{ e.preventDefault(); startHold(); }, {passive:false});
   holdBtn.addEventListener('touchend', e=>{ e.preventDefault(); stopHold(); }, {passive:false});
 
-  // HTMLAudio 経路（失敗しにくいBlob方式）
+  // ===== HTMLAudio: 正しいWAVヘッダで生成して再生 =====
   document.getElementById('htmlAudio').addEventListener('click', ()=>{
     log('HTMLAudioテスト 実行');
     try{
-      // 0.2秒の無音WAVヘッダを雑に作る代わりに、オーディオ要素のsrcObjectを使わずBlobでOK
-      const a = document.createElement('audio');
-      const frames = 44100 * 0.2 | 0; // 0.2s 無音
-      const buf = new Uint8Array(frames); // 中身ゼロ=無音
-      const blob = new Blob([buf], {type:'audio/wav'});
+      const sampleRate = 44100;
+      const seconds = 0.5;
+      const frames = (sampleRate * seconds)|0;
+      const bytesPerSample = 2; // 16bit PCM
+      const dataSize = frames * bytesPerSample;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+      // RIFF/WAVE ヘッダ
+      function str(off, s){ for(let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); }
+      str(0,'RIFF'); view.setUint32(4, 36 + dataSize, true); str(8,'WAVE');
+      str(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true); // PCM
+      view.setUint16(22,1,true); // mono
+      view.setUint32(24,sampleRate,true);
+      view.setUint32(28,sampleRate*bytesPerSample,true); // byteRate
+      view.setUint16(32,bytesPerSample,true); // blockAlign
+      view.setUint16(34,16,true); // bitsPerSample
+      str(36,'data'); view.setUint32(40,dataSize,true);
+      // データ部：440Hz 正弦波
+      let offset = 44;
+      for(let i=0;i<frames;i++){
+        const t = i/sampleRate; const v = Math.sin(2*Math.PI*440*t) * 0.9; // -1..1
+        const s = Math.max(-1, Math.min(1, v));
+        view.setInt16(offset, (s<0? s*0x8000 : s*0x7FFF), true);
+        offset += 2;
+      }
+      const blob = new Blob([buffer], {type:'audio/wav'});
+      const a = new Audio();
       a.src = URL.createObjectURL(blob);
       a.play().then(()=>log('HTMLAudio 再生開始')).catch(e=>log('HTMLAudio 再生失敗: '+e.message));
     }catch(e){ log('HTMLAudio 準備失敗: '+e.message); }
