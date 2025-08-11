@@ -15,15 +15,18 @@
   button{border-radius:10px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;padding:10px 12px;font-size:16px;cursor:pointer}
   button.primary{background:#1f6feb;border-color:#1f6feb}
   .ok{background:#10291a;border:1px solid #1f883d;padding:8px 12px;border-radius:10px}
-  .noselect{ -webkit-user-select:none; user-select:none; }
 </style>
 </head>
 <body>
 <div id="unlock" class="unlock"><button id="unlockBtn" type="button">Audioを有効化（タップ）</button></div>
-<div class="wrap noselect">
+<div class="wrap">
   <h1>iOS オーディオ解放 — 最小テスト版</h1>
   <div class="card">
     <div id="status" class="ok">状態: 未解放</div>
+    <div style="margin:8px 0">
+      <div style="font-size:12px;opacity:.8;margin-bottom:4px">オーディオ出力レベル</div>
+      <div id="meter" style="height:10px;background:#222;border-radius:6px;overflow:hidden"><i style="display:block;height:100%;width:0;background:#2ea043"></i></div>
+    </div>
     <div class="row">
       <button id="selftest" type="button" class="primary">Self Test（短いビープ）</button>
       <button id="holdtest" type="button">（長押し）連続トーン</button>
@@ -35,99 +38,108 @@
 <script>
 (function(){
   const AC = window.AudioContext || window.webkitAudioContext;
-  let ctx = null, master = null, analyser = null;
-  const $ = id => document.getElementById(id);
-  const status = $('status');
-  const meterBar = document.querySelector('#meter > i');
-
-  function log(s){ status.textContent = '状態: ' + s; }
+  let ctx, master, analyser;
+  const status = document.getElementById('status');
+  const log = msg => { status.textContent = '状態: ' + msg; };
 
   function ensureAudio(){
-    if (!ctx) {
-      try { ctx = new AC({latencyHint:'interactive'}); } catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
-      master = ctx.createGain(); master.gain.value = 0.9; // 大きめに
+    if (!ctx){
+      ctx = new AC({latencyHint:'interactive'});
+      master = ctx.createGain();
+      master.gain.value = 0.8;
       master.connect(ctx.destination);
-      analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
-      master.connect(analyser);
-      // 無音1サンプルで起動
-      const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0);
+      analyser = ctx.createAnalyser(); analyser.fftSize = 1024; master.connect(analyser);
+      // 無音バッファで初期化
+      const b = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const s = ctx.createBufferSource();
+      s.buffer = b; s.connect(master); s.start(0);
     }
   }
 
   async function unlockOnce(e){
-    e && e.preventDefault && e.preventDefault();
-    ensureAudio(); if (!ctx) return;
-    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(_){}
-    try{ const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0); }catch(_){}
-    if (ctx.state === 'running') {
-      $('unlock').classList.add('hidden');
-      ['touchstart','pointerdown','click'].forEach(ev=> window.removeEventListener(ev, unlockOnce, true));
+    e && e.preventDefault();
+    ensureAudio();
+    if (!ctx) return;
+    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(e){}
+    if (ctx.state === 'running'){
+      document.getElementById('unlock').classList.add('hidden');
       log('解放済み（running）');
     } else {
-      log('解放できず（'+ctx.state+'）');
+      log('解放できず（' + ctx.state + '）');
     }
   }
-  $('unlockBtn').addEventListener('click', unlockOnce, {once:true});
+  document.getElementById('unlockBtn').addEventListener('click', unlockOnce);
+  // ページどこをタップしても解放できるよう保険
   window.addEventListener('touchstart', unlockOnce, {capture:true, passive:false});
-  window.addEventListener('pointerdown', unlockOnce, {capture:true, passive:false});
-  window.addEventListener('click', unlockOnce, {capture:true});
+  window.addEventListener('pointerdown', unlockOnce, {capture:true});
 
-  // レベルメーター
-  function meterLoop(){
-    if (analyser && meterBar){
+  function beep(accent){
+    if (!ctx || ctx.state !== 'running'){ log('AudioContextが未実行'); return; }
+    const len = Math.floor(ctx.sampleRate * 0.5); // 0.5秒に延長
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<len;i++){
+      const t = i / ctx.sampleRate;
+      const env = Math.exp(-4 * t); // 伸びるエンベロープ
+      data[i] = Math.sin(2 * Math.PI * (accent ? 1000 : 700) * t) * env; // 大きめ周波数
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const g = ctx.createGain(); g.gain.value = 1.0; // 大きめ
+    src.connect(g); g.connect(master);
+    src.start();
+  }
+    const len = Math.floor(ctx.sampleRate * 0.1);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<len;i++){
+      const t = i / ctx.sampleRate;
+      const env = Math.exp(-10 * t);
+      data[i] = Math.sin(2 * Math.PI * (accent ? 880 : 440) * t) * env;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(master);
+    src.start();
+  }
+
+  document.getElementById('selftest').addEventListener('click', () => { log('Self Test 実行'); beep(true); });
+  document.getElementById('selftest').addEventListener('touchend', (e)=>{ e.preventDefault(); log('Self Test 実行(touch)'); beep(true); }, {passive:false});
+
+  let osc;
+  const holdBtn = document.getElementById('holdtest');
+  holdBtn.addEventListener('mousedown', () => { if (!ctx || ctx.state !== 'running') return; startHold(); });
+  holdBtn.addEventListener('mouseup', () => stopHold());
+  holdBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); if (!ctx || ctx.state !== 'running') return; startHold(); }, {passive:false});
+  holdBtn.addEventListener('touchend', (e)=>{ e.preventDefault(); stopHold(); }, {passive:false});
+  function startHold(){
+    if (osc) return; osc = ctx.createOscillator(); osc.frequency.value = 440; osc.connect(master); osc.start(); log('連続トーン開始');
+  }
+  function stopHold(){ if (osc){ osc.stop(); osc.disconnect(); osc=null; log('連続トーン停止'); } } osc.disconnect(); osc = null; log('連続トーン停止'); }
+  });
+
+  document.getElementById('htmlAudio').addEventListener('click', () => {
+    // iOS Safari は data: のWAVが短すぎると失敗することがあるため、同一オリジンの空オーディオを生成
+    try{
+      const a = document.createElement('audio');
+      a.src = URL.createObjectURL(new Blob([new Uint8Array(44100).buffer], {type:'audio/wav'}));
+      a.play().then(()=>log('HTMLAudio 再生開始')).catch(e=>log('HTMLAudio 再生失敗: '+e.message));
+    }catch(e){ log('HTMLAudio 準備失敗: '+e.message); }
+  });
+    audio.play().then(() => log('HTMLAudio 再生開始')).catch(e => log('HTMLAudio 再生失敗: ' + e.message));
+  });
+  // レベルメーターのループ
+  (function meterLoop(){
+    if (analyser){
       const buf = new Uint8Array(analyser.fftSize);
       analyser.getByteTimeDomainData(buf);
       let sum=0; for (let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum += v*v; }
       const rms = Math.sqrt(sum/buf.length);
-      meterBar.style.width = Math.min(1, rms*6) * 100 + '%';
+      const bar = document.querySelector('#meter > i'); if (bar) bar.style.width = Math.min(1, rms*6) * 100 + '%';
     }
     requestAnimationFrame(meterLoop);
-  }
-  requestAnimationFrame(meterLoop);
-
-  // ==== テスト音（大きめ・長め）====
-  function beep(when){
-    if (!ctx || ctx.state !== 'running') { log('AudioContextが未実行'); return; }
-    const dur = 0.5; // 0.5秒
-    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i=0;i<len;i++){
-      const t = i/ctx.sampleRate;
-      const env = Math.exp(-5*t); // 長め
-      data[i] = Math.sin(2*Math.PI*1000*t) * env; // 1kHz
-    }
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const g = ctx.createGain(); g.gain.value = 1.0;
-    src.connect(g); g.connect(master); src.start(when||0);
-  }
-
-  function runSelfTest(){ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; log('Self Test 実行'); beep(t+0.02); }
-  $('selftest').addEventListener('click', runSelfTest);
-  $('selftest').addEventListener('touchend', function(e){ e.preventDefault(); runSelfTest(); }, {passive:false});
-
-  // 長押し連続トーン（さらに確実に聞こえる設定）
-  let holdOsc=null, holdGain=null;
-  function startHold(){ ensureAudio(); if (!ctx || holdOsc) return;
-    holdOsc = ctx.createOscillator(); holdGain = ctx.createGain();
-    holdOsc.type = 'sine'; holdOsc.frequency.value = 440;
-    holdGain.gain.value = 0.6;
-    holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); log('連続トーン開始');
-  }
-  function stopHold(){ if (holdOsc){ holdOsc.stop(); holdOsc.disconnect(); holdGain.disconnect(); holdOsc=null; holdGain=null; log('連続トーン停止'); } }
-  const holdBtn = $('holdtest');
-  holdBtn.addEventListener('touchstart', e=>{ e.preventDefault(); startHold(); }, {passive:false});
-  holdBtn.addEventListener('mousedown', e=>{ e.preventDefault(); startHold(); });
-  ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> holdBtn.addEventListener(ev, e=>{ e.preventDefault(); stopHold(); }, {passive:false}));
-
-  // HTMLAudio 経路
-  $('htmlAudio').addEventListener('click', function(){
-    log('HTMLAudioテスト 実行');
-    const audio = new Audio('data:audio/wav;base64,UklGRgAAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAACAgICAgICAgICAgICAgICA'); // 短いPCM（無音に近い）→反応だけ確認
-    audio.play().then(()=>log('HTMLAudio 再生開始')).catch(e=>alert('HTMLAudio 再生失敗: '+e.message));
-  });
+  })();
 })();
 </script>
-
 </body>
 </html>
