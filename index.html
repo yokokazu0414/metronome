@@ -3,158 +3,94 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Metronome — iOS Debug Build (Fixed)</title>
+<title>Metronome — iOS Audio Unlock Minimal Fix</title>
 <style>
-  body{font-family:sans-serif;margin:0;background:#0e1116;color:#e6edf3}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0e1116;color:#e6edf3}
   .wrap{max-width:760px;margin:40px auto;padding:24px}
   .unlock{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9999}
+  .unlock button{font-size:18px;padding:14px 18px;border-radius:14px;background:#238636;border:1px solid #2ea043;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   .hidden{display:none}
+  .card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  button{border-radius:10px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;padding:10px 12px;font-size:16px}
+  button.primary{background:#1f6feb;border-color:#1f6feb}
   .warn{background:#3b1d1d;border:1px solid #7f1d1d;padding:8px 12px;border-radius:10px;margin-top:10px}
+  .ok{background:#10291a;border:1px solid #1f883d}
 </style>
 </head>
 <body>
 <div id="unlock" class="unlock"><button id="unlockBtn">Audioを有効化（タップ）</button></div>
 <div class="wrap">
-  <h1>iOS 音声デバッグ</h1>
-  <button id="selftest">Self Test</button>
-  <button id="start">Start</button>
-  <button id="stop">Stop</button>
-  <div id="warn" class="warn hidden">音声が検出できません。iPhoneの音量/出力先/サイレントスイッチを確認してください。      <div class="row" style="margin-top:12px;gap:8px">
-        <button id="holdtest">（長押し）連続テスト音</button>
-        <button id="htmlAudio">HTMLAudioテスト</button>
-      </div>
-      <div class="hint">連続テスト音は押している間だけ鳴ります。音量ボタンで音量を上げてください。</div>
+  <h1>iOS オーディオ解放 — 最小テスト版</h1>
+  <div class="card">
+    <div id="status" class="ok" style="padding:8px 12px;border-radius:10px">状態: 未解放</div>
+    <div class="row">
+      <button id="selftest" class="primary">Self Test（短いビープ）</button>
+      <button id="holdtest">（長押し）連続トーン</button>
+      <button id="htmlAudio">HTMLAudioテスト</button>
     </div>
+    <div class="warn" id="warn" style="display:none">音が出ない場合は、iPhoneの音量・サイレントスイッチ・AirPlay出力先（コントロールセンター→AirPlayで<i>iPhone</i>を選択）を確認してください。</div>
   </div>
+</div>
 
 <script>
 (function(){
   const AC = window.AudioContext || window.webkitAudioContext;
-  let ctx = null, master = null, analyser = null;
-
+  let ctx = null, master = null;
   const $ = id => document.getElementById(id);
-  const S = { state: $('state'), time: $('time'), next: $('next'), beat: $('beat') };
-  const meterBar = $('meter').firstElementChild;
-  const led = $('led');
-  const warn = $('warn');
+  const status = $('status');
+
+  function log(s){ status.textContent = '状態: ' + s; }
 
   function ensureAudio(){
     if (!ctx) {
-      try{ ctx = new AC({ latencyHint: 'interactive' }); }catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
+      try {
+        ctx = new AC({ latencyHint: 'interactive' });
+      } catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
       master = ctx.createGain();
-      master.gain.value = parseFloat($('vol').value || '0.7');
-      analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
-      master.connect(analyser); master.connect(ctx.destination);
-      // iOS解放: 無音1サンプル
+      master.gain.value = 0.6;
+      master.connect(ctx.destination);
+      // iOS解放トリック：無音1サンプル再生
       const b = ctx.createBuffer(1, 1, ctx.sampleRate);
       const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
+      log('初期化完了（'+ctx.state+'）');
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
 
   function showUnlock(v){ $('unlock').classList.toggle('hidden', !!v); }
-  const unlockOnce = () => { ensureAudio(); showUnlock(true); removeUnlockListeners(); };
+  const unlockOnce = () => { ensureAudio(); showUnlock(true); log('解放済み（'+ctx.state+'）'); removeUnlockListeners(); };
   const unlockEvents = ['touchstart','pointerup','click'];
   function removeUnlockListeners(){ unlockEvents.forEach(e=>window.removeEventListener(e, unlockOnce, true)); }
   unlockEvents.forEach(e=>window.addEventListener(e, unlockOnce, { capture:true }));
   $('unlockBtn').addEventListener('click', unlockOnce, { once:true });
 
-  // ====== Debug meter loop (スムージング＋ヒステリシス) ======
-  let ema = 0, lastWarnOn = 0, warnShown = false;
-  function loop(){
-    if (ctx){
-      S.state.textContent = ctx.state;
-      S.time.textContent = ctx.currentTime.toFixed(3);
-      const arr = new Uint8Array(analyser.fftSize);
-      analyser.getByteTimeDomainData(arr);
-      let sum = 0; for (let i=0;i<arr.length;i++){ const v = (arr[i]-128)/128; sum += v*v; }
-      const rms = Math.sqrt(sum/arr.length);
-      // 平滑化（指数移動平均）
-      ema = ema*0.85 + rms*0.15;
-      meterBar.style.width = Math.min(1, ema*6) * 120 + 'px';
-      // 1秒連続で小さければ警告表示、少しでも大きければ即消す
-      const now = performance.now();
-      if (ema < 0.004 && started) {
-        if (!warnShown && now - lastWarnOn > 1000) { warn.classList.remove('hidden'); warnShown = true; }
-      } else {
-        warn.classList.add('hidden'); warnShown = false; lastWarnOn = now;
-      }
-    }
-    requestAnimationFrame(loop);
-  }
-  requestAnimationFrame(loop);
-
-  // ====== Click buffers（＋Oscillator fallback） ======
-  let clickHi = null, clickLo = null;
-  function makeBuffer(freq, dur){
-    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  // Self Test: 2クリック音を即時スケジュール
+  function beep(accent, when){
+    const src = ctx.createBufferSource();
+    const len = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i=0;i<len;i++){
-      const t = i/ctx.sampleRate;
-      const env = Math.exp(-45*t);
-      const sine = Math.sin(2*Math.PI*freq*t);
-      data[i] = sine*env;
-    }
-    return buf;
-  }
-  function prepare(){ if (!ctx) ensureAudio(); clickHi = makeBuffer(2400, 0.02); clickLo = makeBuffer(1600, 0.02); }
-  function scheduleClick(when, accent){
-    if (!clickHi) prepare();
-    try{
-      const src = ctx.createBufferSource(); src.buffer = accent ? clickHi : clickLo;
-      const g = ctx.createGain(); g.gain.value = accent ? 0.9 : 0.6;
-      src.connect(g); g.connect(master); src.start(when);
-    }catch(e){
-      const osc = ctx.createOscillator(); const g = ctx.createGain();
-      g.gain.setValueAtTime(accent?0.5:0.35, when); g.gain.exponentialRampToValueAtTime(0.0001, when+0.05);
-      osc.frequency.setValueAtTime(accent?1200:800, when); osc.connect(g); g.connect(master);
-      osc.start(when); osc.stop(when+0.06);
-    }
+    for (let i=0;i<len;i++){ const t=i/ctx.sampleRate; const env=Math.exp(-40*t); data[i] = Math.sin(2*Math.PI*(accent?1400:900)*t)*env; }
+    src.buffer = buf; const g = ctx.createGain(); g.gain.value = accent?0.9:0.6; src.connect(g); g.connect(master); src.start(when||0);
   }
 
-  // ====== Scheduler ======
-  let nextNoteTime = 0, currentBeat = 0, timer = null, started = false;
-  const lookahead = 0.025, ahead = 0.1;
-  function getBeats(){ return parseInt($('beats').value,10)||4; }
-  function bpm(){ return Math.min(300, Math.max(20, parseInt($('bpm').value,10)||120)); }
-  function nextNote(){ const secPerBeat = 60 / bpm(); nextNoteTime += secPerBeat; currentBeat = (currentBeat+1) % getBeats(); }
-  function scheduler(){
-    while (nextNoteTime < ctx.currentTime + ahead){
-      const when = nextNoteTime; const accent = (currentBeat === 0);
-      scheduleClick(when, accent);
-      const delay = Math.max(0, (when - ctx.currentTime) * 1000);
-      setTimeout(()=>{ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 80); S.beat.textContent = currentBeat+1; }, delay);
-      S.next.textContent = when.toFixed(3); nextNote();
-    }
-  }
-  function start(){ ensureAudio(); prepare(); nextNoteTime = ctx.currentTime + 0.05; currentBeat = getBeats()-1; if (timer) clearInterval(timer); timer = setInterval(scheduler, lookahead*1000); started = true; $('start').disabled = true; $('stop').disabled = false; }
-  function stop(){ if (timer) clearInterval(timer); timer=null; started=false; $('start').disabled = false; $('stop').disabled = true; }
+  $('selftest').addEventListener('click', ()=>{ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; beep(true, t+0.01); beep(false, t+0.2); });
 
-  // ====== UI wiring ======
-  $('bpm').addEventListener('input', e=> $('bpmRange').value = e.target.value);
-  $('bpmRange').addEventListener('input', e=> $('bpm').value = e.target.value);
-  $('vol').addEventListener('input', e=> { if (master) master.gain.value = parseFloat(e.target.value); });
-  $('start').addEventListener('click', ()=>{ ensureAudio(); start(); });
-  $('stop').addEventListener('click', stop);
-  document.addEventListener('visibilitychange', ()=>{ /* モバイルでのちらつき回避のため停止しない */ });
-
-  // 長押し連続テスト音（440Hz）
+  // 長押し連続トーン
   let holdOsc=null, holdGain=null;
-  function startHold(){ ensureAudio(); holdOsc = ctx.createOscillator(); holdGain = ctx.createGain(); holdOsc.frequency.value = 440; holdGain.gain.value = 0.2; holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); }
+  function startHold(){ ensureAudio(); if (!ctx) return; holdOsc = ctx.createOscillator(); holdGain = ctx.createGain(); holdOsc.frequency.value = 440; holdGain.gain.value = 0.25; holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); }
   function stopHold(){ if (holdOsc){ holdOsc.stop(); holdOsc.disconnect(); holdGain.disconnect(); holdOsc=null; holdGain=null; } }
   const holdBtn = $('holdtest');
-  holdBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(); });
+  holdBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(); }, {passive:false});
   holdBtn.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(); });
   ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> holdBtn.addEventListener(ev, stopHold));
 
-  // HTMLAudioテスト（WebAudioを使わない経路）
+  // HTMLAudio 経路
   $('htmlAudio').addEventListener('click', ()=>{
     const audio = new Audio('data:audio/wav;base64,UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAAAAAAD//w8AAP8PAAD/DwAA/w8AAP8PAAD/DwAA');
     audio.play().catch(e=>alert('HTMLAudio 再生失敗: '+e.message));
   });
-
-  $('selftest').addEventListener('click', ()=>{ ensureAudio(); prepare(); scheduleClick(ctx.currentTime+0.01, true); scheduleClick(ctx.currentTime+0.2, false); });
 })();
 </script>
 </body>
