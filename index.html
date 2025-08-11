@@ -16,7 +16,7 @@
   button.primary{background:#1f6feb;border-color:#1f6feb}
   .warn{background:#3b1d1d;border:1px solid #7f1d1d;padding:8px 12px;border-radius:10px;margin-top:10px}
   .ok{background:#10291a;border:1px solid #1f883d}
-.noselect{ -webkit-user-select:none; user-select:none; }
+  .noselect{ -webkit-user-select:none; user-select:none; }
 </style>
 </head>
 <body>
@@ -30,7 +30,6 @@
       <button id="holdtest" type="button">（長押し）連続トーン</button>
       <button id="htmlAudio" type="button">HTMLAudioテスト</button>
     </div>
-    <div class="warn" id="warn" style="display:none">音が出ない場合は、iPhoneの音量・サイレントスイッチ・AirPlay出力先（コントロールセンター→AirPlayで<i>iPhone</i>を選択）を確認してください。</div>
   </div>
 </div>
 
@@ -53,7 +52,6 @@
       master.connect(ctx.destination);
       const b = ctx.createBuffer(1, 1, ctx.sampleRate);
       const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
-      log('初期化完了（'+ctx.state+'）');
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
@@ -62,7 +60,6 @@
   const unlockOnce = async () => {
     ensureAudio();
     try { if (ctx.state === 'suspended') await ctx.resume(); } catch(e){}
-    // resume 後に無音をもう一度鳴らす（iOSで確実性アップ）
     try {
       const b = ctx.createBuffer(1, 1, ctx.sampleRate);
       const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
@@ -77,26 +74,45 @@
   $('unlockBtn').addEventListener('click', unlockOnce, { once:true });
 
   function beep(accent, when){
+    if (!ctx || ctx.state !== 'running') { log('AudioContextが動作していません'); return; }
     const src = ctx.createBufferSource();
-    const len = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
+    const len = Math.max(1, Math.floor(ctx.sampleRate * 0.1)); // 長めに
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
-    for (let i=0;i<len;i++){ const t=i/ctx.sampleRate; const env=Math.exp(-40*t); data[i] = Math.sin(2*Math.PI*(accent?1400:900)*t)*env; }
+    for (let i=0;i<len;i++){ const t=i/ctx.sampleRate; const env=Math.exp(-20*t); data[i] = Math.sin(2*Math.PI*(accent?880:440)*t)*env; }
     src.buffer = buf; const g = ctx.createGain(); g.gain.value = accent?0.9:0.6; src.connect(g); g.connect(master); src.start(when||0);
   }
 
-  $('selftest').addEventListener('click', ()=>{ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; beep(true, t+0.01); beep(false, t+0.2); });
+  $('selftest').addEventListener('click', function(){ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; log('Self Test 実行'); beep(true, t+0.01); beep(false, t+0.2); });
+  document.getElementById('selftest').addEventListener('touchend', function(e){ e.preventDefault(); ensureAudio(); if (!ctx) return; const t = ctx.currentTime; log('Self Test 実行(touch)'); beep(true, t+0.01); beep(false, t+0.2); }, {passive:false});
+    const t = ctx.currentTime;
+    beep(true, t+0.01);
+    beep(false, t+0.3);
+  });
 
   let holdOsc=null, holdGain=null;
-  function startHold(){ ensureAudio(); if (!ctx) return; holdOsc = ctx.createOscillator(); holdGain = ctx.createGain(); holdOsc.frequency.value = 440; holdGain.gain.value = 0.25; holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); }
+  function startHold(){
+    ensureAudio();
+    holdOsc = ctx.createOscillator();
+    holdGain = ctx.createGain();
+    holdOsc.frequency.value = 440;
+    holdGain.gain.value = 0.25;
+    holdOsc.connect(holdGain);
+    holdGain.connect(master);
+    holdOsc.start();
+  }
   function stopHold(){ if (holdOsc){ holdOsc.stop(); holdOsc.disconnect(); holdGain.disconnect(); holdOsc=null; holdGain=null; } }
   const holdBtn = $('holdtest');
-  holdBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); startHold(); }, {passive:false});
-  holdBtn.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(); });
-  ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> holdBtn.addEventListener(ev, stopHold));
+  holdBtn.addEventListener('touchstart', function(e){ e.preventDefault(); startHold(); }, {passive:false});
+  holdBtn.addEventListener('mousedown', function(e){ e.preventDefault(); startHold(); });
+  holdBtn.addEventListener('click', function(e){ /* click では開始しない */ });
+  ['touchend','touchcancel','mouseup','mouseleave'].forEach(function(ev){ holdBtn.addEventListener(ev, function(e){ e.preventDefault(); stopHold(); }, {passive:false}); });
 
-  $('htmlAudio').addEventListener('click', ()=>{
+  $('htmlAudio').addEventListener('click', function(){
+    log('HTMLAudioテスト 実行');
     const audio = new Audio('data:audio/wav;base64,UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAAAAAAD//w8AAP8PAAD/DwAA/w8AAP8PAAD/DwAA');
+    audio.play().then(function(){ log('HTMLAudio 再生開始'); }).catch(function(e){ alert('HTMLAudio 再生失敗: '+e.message); });
+  });
     audio.play().catch(e=>alert('HTMLAudio 再生失敗: '+e.message));
   });
 })();
