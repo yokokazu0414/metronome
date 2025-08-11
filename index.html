@@ -12,22 +12,23 @@
   .hidden{display:none}
   .card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:8px 0}
-  button{border-radius:10px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;padding:10px 12px;font-size:16px}
+  button{border-radius:10px;border:1px solid #30363d;background:#0d1117;color:#e6edf3;padding:10px 12px;font-size:16px;cursor:pointer}
   button.primary{background:#1f6feb;border-color:#1f6feb}
   .warn{background:#3b1d1d;border:1px solid #7f1d1d;padding:8px 12px;border-radius:10px;margin-top:10px}
   .ok{background:#10291a;border:1px solid #1f883d}
+.noselect{ -webkit-user-select:none; user-select:none; }
 </style>
 </head>
 <body>
-<div id="unlock" class="unlock"><button id="unlockBtn">Audioを有効化（タップ）</button></div>
-<div class="wrap">
+<div id="unlock" class="unlock"><button id="unlockBtn" type="button">Audioを有効化（タップ）</button></div>
+<div class="wrap noselect">
   <h1>iOS オーディオ解放 — 最小テスト版</h1>
   <div class="card">
     <div id="status" class="ok" style="padding:8px 12px;border-radius:10px">状態: 未解放</div>
     <div class="row">
-      <button id="selftest" class="primary">Self Test（短いビープ）</button>
-      <button id="holdtest">（長押し）連続トーン</button>
-      <button id="htmlAudio">HTMLAudioテスト</button>
+      <button id="selftest" type="button" class="primary">Self Test（短いビープ）</button>
+      <button id="holdtest" type="button">（長押し）連続トーン</button>
+      <button id="htmlAudio" type="button">HTMLAudioテスト</button>
     </div>
     <div class="warn" id="warn" style="display:none">音が出ない場合は、iPhoneの音量・サイレントスイッチ・AirPlay出力先（コントロールセンター→AirPlayで<i>iPhone</i>を選択）を確認してください。</div>
   </div>
@@ -50,7 +51,6 @@
       master = ctx.createGain();
       master.gain.value = 0.6;
       master.connect(ctx.destination);
-      // iOS解放トリック：無音1サンプル再生
       const b = ctx.createBuffer(1, 1, ctx.sampleRate);
       const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
       log('初期化完了（'+ctx.state+'）');
@@ -59,13 +59,23 @@
   }
 
   function showUnlock(v){ $('unlock').classList.toggle('hidden', !!v); }
-  const unlockOnce = () => { ensureAudio(); showUnlock(true); log('解放済み（'+ctx.state+'）'); removeUnlockListeners(); };
-  const unlockEvents = ['touchstart','pointerup','click'];
+  const unlockOnce = async () => {
+    ensureAudio();
+    try { if (ctx.state === 'suspended') await ctx.resume(); } catch(e){}
+    // resume 後に無音をもう一度鳴らす（iOSで確実性アップ）
+    try {
+      const b = ctx.createBuffer(1, 1, ctx.sampleRate);
+      const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
+    } catch(e){}
+    const ok = (ctx.state === 'running');
+    log(ok ? '解放済み（running）' : '解放できず（'+ctx.state+'）');
+    if (ok) { showUnlock(true); removeUnlockListeners(); }
+  };
+  const unlockEvents = ['pointerdown','touchstart','pointerup','click'];
   function removeUnlockListeners(){ unlockEvents.forEach(e=>window.removeEventListener(e, unlockOnce, true)); }
-  unlockEvents.forEach(e=>window.addEventListener(e, unlockOnce, { capture:true }));
+  unlockEvents.forEach(e=>window.addEventListener(e, unlockOnce, { capture:true, passive:false }));
   $('unlockBtn').addEventListener('click', unlockOnce, { once:true });
 
-  // Self Test: 2クリック音を即時スケジュール
   function beep(accent, when){
     const src = ctx.createBufferSource();
     const len = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
@@ -77,7 +87,6 @@
 
   $('selftest').addEventListener('click', ()=>{ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; beep(true, t+0.01); beep(false, t+0.2); });
 
-  // 長押し連続トーン
   let holdOsc=null, holdGain=null;
   function startHold(){ ensureAudio(); if (!ctx) return; holdOsc = ctx.createOscillator(); holdGain = ctx.createGain(); holdOsc.frequency.value = 440; holdGain.gain.value = 0.25; holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); }
   function stopHold(){ if (holdOsc){ holdOsc.stop(); holdOsc.disconnect(); holdGain.disconnect(); holdOsc=null; holdGain=null; } }
@@ -86,7 +95,6 @@
   holdBtn.addEventListener('mousedown', (e)=>{ e.preventDefault(); startHold(); });
   ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> holdBtn.addEventListener(ev, stopHold));
 
-  // HTMLAudio 経路
   $('htmlAudio').addEventListener('click', ()=>{
     const audio = new Audio('data:audio/wav;base64,UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAAAAAAD//w8AAP8PAAD/DwAA/w8AAP8PAAD/DwAA');
     audio.play().catch(e=>alert('HTMLAudio 再生失敗: '+e.message));
