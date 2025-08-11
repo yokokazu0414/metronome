@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Metronome</title>
+<title>Metronome Studio v3 — Fixed (Autoplay‑safe)</title>
 <style>
-  body { background: #111; color: #fff; font-family: sans-serif; text-align: center; }
-  h1 { margin-top: 20px; }
-  .controls { margin: 20px auto; max-width: 400px; padding: 10px; background: #222; border-radius: 10px; }
-  .label { margin-top: 10px; }
-  input[type=range] { width: 100%; }
+  body { font-family: sans-serif; background: #111; color: #fff; text-align: center; margin: 0; }
+  h1 { padding: 20px 0; }
+  .controls { max-width: 500px; margin: auto; background: #222; padding: 20px; border-radius: 10px; }
+  .label { margin-top: 15px; }
+  input[type=range], select { width: 100%; margin: 5px 0; }
   button { margin: 5px; padding: 10px 20px; font-size: 16px; border: none; border-radius: 5px; cursor: pointer; }
   .start { background: #4caf50; color: #fff; }
   .stop { background: #f44336; color: #fff; }
@@ -17,7 +17,7 @@
 </style>
 </head>
 <body>
-<h1>Metronome</h1>
+<h1>Metronome Studio v3</h1>
 <div class="controls">
   <div class="label">BPM: <span id="bpmVal">120</span></div>
   <input type="range" id="bpm" min="30" max="300" value="120">
