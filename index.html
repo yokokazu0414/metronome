@@ -1,147 +1,41 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Metronome Studio v3 — Fat Mix & Reverb (Fixed)</title>
-<style>
-  body { font-family: sans-serif; background: #111; color: #fff; padding: 20px; }
-  h1 { text-align: center; }
-  #controls { display: flex; gap: 10px; margin-bottom: 10px; }
-  button { padding: 6px 12px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; }
-  button#start { background: #2ecc71; color: #fff; }
-  button#stop { background: #e74c3c; color: #fff; }
-  #unlockOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); color: #fff; display: flex; align-items: center; justify-content: center; flex-direction: column; z-index: 9999; }
-  pre { background: #222; padding: 10px; border-radius: 6px; overflow: auto; }
-</style>
-</head>
-<body>
-<h1>Metronome Studio v3 — Fat Mix & Reverb (Fixed)</h1>
-<p>共有時に音が出ない問題へ対策：自動再生規制の回避と、DOM読み込み完了後に安全に初期化します。</p>
-<div>
-  BPM: <input id="bpm" type="number" value="100" style="width:60px"> 拍子: <input id="beats" type="number" value="4" style="width:40px"> / <input id="beatUnit" type="number" value="4" style="width:40px">
-  細分: <select id="subdiv">
-    <option value="quarter">4分</option>
-    <option value="eighth" selected>8分</option>
-    <option value="triplet">3連</option>
-    <option value="sixteenth">16分</option>
-  </select>
-</div>
-<div>
-  <label><input type="checkbox" id="kick" checked> Kick</label>
-  <label><input type="checkbox" id="snare" checked> Snare</label>
-  <label><input type="checkbox" id="hihat"> HiHat</label>
-  <label><input type="checkbox" id="tamb"> Tambourine</label>
-  <label><input type="checkbox" id="shaker"> Shaker</label>
-  <label><input type="checkbox" id="conga"> Conga</label>
-  <label><input type="checkbox" id="bongo"> Bongo</label>
-</div>
-<div id="controls">
-  <button id="start">Start</button>
-  <button id="stop">Stop</button>
-</div>
-<details>
-  <summary>Diagnostics / Self-tests（問題があればここを開いてください）</summary>
-  <pre id="diaglog"></pre>
-</details>
-<div id="unlockOverlay">
-  <button id="unlock">Audioを有効化</button>
-</div>
-<script>
-(() => {
-  const onReady = (fn) => {
-    if (document.readyState !== 'loading') fn();
-    else document.addEventListener('DOMContentLoaded', fn, { once: true });
-  };
-  const log = (...args) => {
-    console.log('[Metronome]', ...args);
-    const pre = document.getElementById('diaglog');
-    if (pre) pre.textContent += '\n' + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
-  };
-  const el = (id) => document.getElementById(id);
-  let ctx, master;
-  let bpm=100, beats=4, beatUnit=4, subdiv='eighth';
-  let playing=false, step=0, nextTime=0;
-  const schedAhead=0.14;
+修正版の `playTamb` 関数を以下のように変更してください。これにより、Hi-Hat と Tambourine が異なる音色になります。
 
-  function initAudio(){
-    if (ctx) return ctx;
-    ctx = new (window.AudioContext||window.webkitAudioContext)();
-    master = ctx.createGain();
-    const comp = ctx.createDynamicsCompressor();
-    master.connect(comp).connect(ctx.destination);
-    return ctx;
-  }
-
-  async function unlockAudio(){
-    initAudio();
-    try { await ctx.resume(); } catch(e) {}
-    try {
-      const src = ctx.createBufferSource();
-      const buf = ctx.createBuffer(1, 1, ctx.sampleRate);
-      src.buffer = buf; src.connect(master); src.start(0); src.stop(0);
-    } catch(e) {}
-    if (ctx.state === 'running') {
-      const ov = document.getElementById('unlockOverlay');
-      if (ov) ov.style.display = 'none';
+```javascript
+function playTamb(t){
+  // Tambourine: multiple bright jingle grains (distinct from single-hit Hi-Hat)
+  const grains = 4;
+  for (let k = 0; k < grains; k++) {
+    const delay = (k === 0 ? 0 : (0.010 + Math.random()*0.020) * k); // small stagger
+    const n = ctx.createBufferSource();
+    const len = (ctx.sampleRate * 0.022) | 0; // very short grain
+    const b = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      // tapered noise for a crisp jingle tick
+      d[i] = (Math.random()*2 - 1) * Math.exp(-i / (len * 0.6));
     }
+    n.buffer = b;
+    const bp1 = ctx.createBiquadFilter(); bp1.type = 'bandpass'; bp1.frequency.value = 7500 + Math.random()*2000; bp1.Q.value = 8;
+    const bp2 = ctx.createBiquadFilter(); bp2.type = 'bandpass'; bp2.frequency.value = 12000; bp2.Q.value = 3;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.55, t + delay);
+    g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.08);
+    n.connect(bp1).connect(bp2).connect(g).connect(master);
+    n.start(t + delay); n.stop(t + delay + 0.09);
   }
+}
+  n.buffer=b;
+  const bp=ctx.createBiquadFilter();
+  bp.type='bandpass';
+  bp.frequency.value=6000; // Hi-Hat より少し低め
+  bp.Q.value=0.7;
+  const g=ctx.createGain();
+  g.gain.setValueAtTime(0.8,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+0.12);
+  n.connect(bp).connect(g).connect(master);
+  n.start(t);
+  n.stop(t+0.13);
+}
+```
 
-  function computeSecPerStep(_bpm, _beatUnit, _subdiv){
-    const spb = 60 / _bpm;
-    const stepsPerBeat = _subdiv==='quarter'?1:_subdiv==='eighth'?2:_subdiv==='triplet'?3:4;
-    return spb * (4/_beatUnit) / stepsPerBeat;
-  }
-
-  function playKick(t){ const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(50, t+0.1); gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.3); osc.connect(gain).connect(master); osc.start(t); osc.stop(t+0.3); }
-  function playSnare(t){ const noise = ctx.createBufferSource(); const buffer = ctx.createBuffer(1, ctx.sampleRate*0.2, ctx.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<data.length;i++){ data[i] = Math.random()*2-1; } noise.buffer = buffer; const filter = ctx.createBiquadFilter(); filter.type='highpass'; filter.frequency.value=1500; const gain = ctx.createGain(); gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.2); noise.connect(filter).connect(gain).connect(master); noise.start(t); noise.stop(t+0.2); }
-  function playHihat(t){ const noise = ctx.createBufferSource(); const buffer = ctx.createBuffer(1, ctx.sampleRate*0.05, ctx.sampleRate); const data = buffer.getChannelData(0); for(let i=0;i<data.length;i++){ data[i] = Math.random()*2-1; } noise.buffer = buffer; const filter = ctx.createBiquadFilter(); filter.type='highpass'; filter.frequency.value=5000; const gain = ctx.createGain(); gain.gain.setValueAtTime(0.7, t); gain.gain.exponentialRampToValueAtTime(0.01, t+0.05); noise.connect(filter).connect(gain).connect(master); noise.start(t); noise.stop(t+0.05); }
-  const playTamb = (t)=> playHihat(t);
-  const playShaker = (t)=> playHihat(t);
-  function playConga(t){ const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type='sine'; osc.frequency.setValueAtTime(400, t); gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.2); osc.connect(gain).connect(master); osc.start(t); osc.stop(t+0.2); }
-  function playBongo(t){ const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.type='sine'; osc.frequency.setValueAtTime(600, t); gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.001, t+0.15); osc.connect(gain).connect(master); osc.start(t); osc.stop(t+0.15); }
-
-  function scheduleStep(i, t){
-    const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
-    const stepInBeat = i % stepsPerBeat;
-    const beatInBar = Math.floor(i/stepsPerBeat) % beats;
-    if(el('kick').checked && stepInBeat===0) playKick(t);
-    if(el('snare').checked && stepInBeat===0 && (beatInBar%2===1)) playSnare(t);
-    if(el('hihat').checked) playHihat(t);
-    if(el('tamb').checked) playTamb(t);
-    if(el('shaker').checked) playShaker(t);
-    if(el('conga').checked && stepInBeat===0 && beatInBar%2===0) playConga(t);
-    if(el('bongo').checked){ const perBeat=2; const eighth=(stepInBeat*perBeat)/stepsPerBeat; if(Number.isInteger(eighth) && (eighth%2===1)) playBongo(t); }
-  }
-
-  function scheduler(){
-    while(nextTime < ctx.currentTime + schedAhead){
-      scheduleStep(step, nextTime);
-      nextTime += computeSecPerStep(bpm, beatUnit, subdiv);
-      step++;
-    }
-  }
-
-  async function play(){
-    await unlockAudio();
-    bpm = parseInt(el('bpm').value || '100', 10);
-    beats = parseInt(el('beats').value || '4', 10);
-    beatUnit = parseInt(el('beatUnit').value || '4', 10);
-    subdiv = el('subdiv').value || 'eighth';
-    playing = true; step = 0; nextTime = ctx.currentTime + 0.05;
-    (function tick(){ if(!playing) return; scheduler(); requestAnimationFrame(tick); })();
-  }
-  function stop(){ playing=false; }
-
-  onReady(() => {
-    el('unlock').addEventListener('click', unlockAudio);
-    el('start').addEventListener('click', play);
-    el('stop').addEventListener('click', stop);
-    document.addEventListener('pointerdown', ()=>{ if(!ctx || ctx.state!=='running'){ unlockAudio(); } });
-    document.addEventListener('keydown', ()=>{ if(!ctx || ctx.state!=='running'){ unlockAudio(); } });
-    document.addEventListener('visibilitychange', ()=>{ if(ctx && document.visibilityState==='visible' && ctx.state==='suspended'){ ctx.resume(); } });
-  });
-})();
-</script>
-</body>
-</html>
+これで Tambourine の音は、Hi-Hat（高域カット、短い）とは異なり、中高域でやや長めの残響を持つ音になります。
