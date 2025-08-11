@@ -62,7 +62,7 @@
   .pair{ display:grid; grid-template-columns: 1fr auto 1fr; gap:8px; align-items:center }
   .pair > *{ min-width:0 }  /* prevent overflow on narrow screens */
 
-  /* ===== Segmented (beat unit option) ===== */
+  /* ===== Segmented (beat unit option, kept for future) ===== */
   .seg{ display:flex; background:#0d141c; border:1px solid var(--border); border-radius:14px; overflow:hidden }
   .seg button{ flex:1; padding:10px 10px; font-size:15px; border:0; background:transparent; color:var(--text) }
   .seg button.active{ background:rgba(125,211,252,.18); color:#eaf6ff }
@@ -147,7 +147,7 @@
         <div class="kitGrid">
           <label class="chip"><input type="checkbox" id="kick" checked> Kick</label>
           <label class="chip"><input type="checkbox" id="snare" checked> Snare</label>
-          <label class="chip"><input type="checkbox" id="hihat" checked> Hi‑Hat</label>
+          <label class="chip"><input type="checkbox" id="hihat" checked> Hi-Hat</label>
           <label class="chip"><input type="checkbox" id="tamb"> Tambourine</label>
         </div>
         <div class="kitGrid-bottom">
@@ -163,7 +163,7 @@
       </div>
     </div>
 
-    <details id="diag" class="panel"><summary>Diagnostics / Self‑tests</summary><pre id="diaglog">Running…</pre></details>
+    <details id="diag" class="panel"><summary>Diagnostics / Self-tests</summary><pre id="diaglog">Running…</pre></details>
   </div>
 
   <!-- Unlock overlay -->
@@ -223,12 +223,31 @@
     return spb * (4/_beatUnit) / stepsPerBeat;
   }
 
-  // ===== Instruments =====
-  function playKick(t){ const osc = ctx.createOscillator(); const g = ctx.createGain(); osc.frequency.setValueAtTime(150,t); osc.frequency.exponentialRampToValueAtTime(50,t+0.1); g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.3); osc.connect(g).connect(master); osc.start(t); osc.stop(t+0.3); }
-  function playSnare(t){ const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.2, ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500; const g=ctx.createGain(); g.gain.setValueAtTime(1,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.2); }
-  function playHihat(t){ const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000; const g=ctx.createGain(); g.gain.setValueAtTime(0.6,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.05); }
+  // ===== Instruments (vol-capable for accenting) =====
+  function playKick(t, vol=1){
+    const osc = ctx.createOscillator(); const g = ctx.createGain();
+    osc.frequency.setValueAtTime(150,t);
+    osc.frequency.exponentialRampToValueAtTime(50,t+0.1);
+    g.gain.setValueAtTime(1*vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t+0.3);
+    osc.connect(g).connect(master); osc.start(t); osc.stop(t+0.3);
+  }
+  function playSnare(t, vol=1){
+    const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.2, ctx.sampleRate);
+    const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; }
+    n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500;
+    const g=ctx.createGain(); g.gain.setValueAtTime(1*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
+    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.2);
+  }
+  function playHihat(t, vol=1){
+    const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
+    const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b;
+    const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.6*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
+    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.05);
+  }
 
-  // Tambourine: multiple bright grains for distinct character
+  // Tambourine: multiple bright grains (distinct from Hi-Hat)
   function playTamb(t){
     const grains = 4;
     for (let k = 0; k < grains; k++) {
@@ -246,23 +265,51 @@
       n.start(t + delay); n.stop(t + delay + 0.09);
     }
   }
-
   function playShaker(t){ const n=ctx.createBufferSource(); const len=(ctx.sampleRate*0.05)|0; const b=ctx.createBuffer(1,len,ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3000; bp.Q.value=1.2; const g=ctx.createGain(); g.gain.setValueAtTime(0.6,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.06); n.connect(bp).connect(g).connect(master); n.start(t); n.stop(t+0.07); }
   function playConga(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(400,t); g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.2); o.connect(g).connect(master); o.start(t); o.stop(t+0.2); }
   function playBongo(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(600,t); g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.connect(g).connect(master); o.start(t); o.stop(t+0.15); }
 
-  // ===== Scheduler =====
+  // ===== Scheduler with accents =====
   function scheduleStep(i,t){
     const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
     const beatIndex = Math.floor(i/stepsPerBeat);
-    const stepInBeat = i % stepsPerBeat; const beatInBar = beatIndex % beats;
-    if(el('kick').checked && stepInBeat===0) playKick(t);
-    if(el('snare').checked && stepInBeat===0 && (beatInBar%2===1)) playSnare(t);
-    if(el('hihat').checked) playHihat(t);
-    if(el('tamb').checked) playTamb(t);
+    const stepInBeat = i % stepsPerBeat;
+    const beatInBar = beatIndex % beats; // 0..(beats-1)
+
+    // Accent plan (default for 4/4): 1=strong, 2=weak, 3=mid, 4=weak
+    let kickLevel = 0.7;                     // base weak
+    if (beatInBar === 0) kickLevel = 1.0;    // downbeat strong
+    else if (beats>=4 && beatInBar === Math.floor(beats/2)) kickLevel = 0.85; // mid-bar (3rd in 4/4)
+
+    const addDownbeatClick = (beatInBar === 0 && stepInBeat===0); // optional helper click
+
+    // On-beat events
+    if(stepInBeat===0){
+      if(el('kick').checked) playKick(t, kickLevel);
+      // Snare on 2 & 4 but a bit softer to avoid 2/2 feel
+      if(el('snare').checked && (beatInBar%2===1)) playSnare(t, 0.8);
+    }
+
+    // Continuous textures
+    if(el('hihat').checked)  playHihat(t, 0.7);
+    if(el('tamb').checked)   playTamb(t);
     if(el('shaker').checked) playShaker(t);
+
     if(el('conga').checked && stepInBeat===0 && beatInBar%2===0) playConga(t);
-    if(el('bongo').checked){ const perBeat=2; const eighth=(stepInBeat*perBeat)/stepsPerBeat; if(Number.isInteger(eighth) && (eighth%2===1)) playBongo(t); }
+    if(el('bongo').checked){
+      const perBeat=2; const eighth=(stepInBeat*perBeat)/stepsPerBeat;
+      if(Number.isInteger(eighth) && (eighth%2===1)) playBongo(t);
+    }
+
+    // Optional: bright downbeat click for clear bar start
+    if (addDownbeatClick){
+      try{
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type='square'; o.frequency.setValueAtTime(1550, t);
+        g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.05);
+        o.connect(g).connect(master); o.start(t); o.stop(t+0.06);
+      }catch(_){}
+    }
   }
 
   function scheduler(){ while(nextTime < ctx.currentTime + schedAhead){ scheduleStep(step, nextTime); nextTime += computeSecPerStep(bpm, beatUnit, subdiv); step++; } }
@@ -291,13 +338,13 @@
     document.addEventListener('pointerdown', ()=>{ if(!ctx || ctx.state!=='running'){ unlockAudio(); } }, { once:true });
     document.addEventListener('visibilitychange', ()=>{ if(ctx && document.visibilityState==='visible' && ctx.state==='suspended'){ ctx.resume(); } });
 
-    // ===== Self‑tests =====
+    // ===== Self-tests =====
     const results = [];
     const pass = (name)=> results.push('PASS  ' + name);
     const fail = (name, extra='')=> results.push('FAIL  ' + name + (extra? ' — ' + extra : ''));
 
     try {
-      const required = ['bpm','beats','beatUnit','subdiv','start','stop','unlock','volume','kick','snare','hihat'];
+      const required = ['bpm','beats','beatUnit','subdiv','start','stop','unlock','volume','kick','snare','hihat'];const required = ['bpm'、 'beats'、 'beatunit'、 'subdiv'、 'start'、 'stop'、 'lock'、 'volume'、 'kick'、 'snare'、 'hihat'];
       const ok = required.every(id => !!document.getElementById(id));
       ok ? pass('DOM elements present: ' + required.join(', ')) : fail('DOM elements missing', required.filter(id=>!document.getElementById(id)).join(', '));
     } catch(e){ fail('DOM presence check', e.message); }
@@ -317,7 +364,7 @@
     try { const circular={}; circular.self=circular; log('circular', circular); pass('log circular fallback works'); } catch(e){ fail('log circular', e.message); }
 
     const pre = document.getElementById('diaglog');
-    if (pre) pre.textContent = (pre.textContent||'') + '\\n' + results.join('\\n');  // ← 改行は明示リテラル
+    if (pre) pre.textContent = (pre.textContent||'') + '\n' + results.join('\n');  // ← 改行は明示リテラル
   });
 })();
 </script>
