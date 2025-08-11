@@ -2,391 +2,208 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Metronome Studio v4 — Mobile Optimized (Full Kit)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Metronome Studio v4</title>
 <style>
-  /* ===== Theme & Reset (mobile-first, no horizontal scroll) ===== */
-  :root{
-    color-scheme: dark;
-    --bg:#0d1117;         /* deep charcoal */
-    --bg2:#0f141b;        /* card shadow tone */
-    --panel:#121821;      /* card */
-    --border:#2a3442;     /* hairline */
-    --divider:#3b4656;    /* slightly brighter for separators */
-    --text:#e7ecf3;       /* main text */
-    --muted:#9fb0c3;      /* muted text */
-    --accent:#7dd3fc;     /* ice blue */
-    --accent2:#c0cad6;    /* SILVER accent */
-    --ok:#10b981;         /* primary */
-    --danger:#ef4444;     /* danger */
+  :root { color-scheme: dark;
+    --bg:#0b0f14;
+    --panel:#10161f;
+    --border:#223040;
+    --text:#e8f0ff;
+    --muted:#8aa0b5;
+    --accent:#3b82f6;
+    --accent2:#10b981;
+    --danger:#ef4444;
+    --silver:#c0c0c0;
   }
-  *,*::before,*::after{ box-sizing:border-box }
-  html,body{
-    margin:0; padding:0; width:100%; max-width:100%; overflow-x:hidden;
-    background:
-      radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,.06), transparent 60%),
-      linear-gradient(180deg, #0f141b 0%, #0c1117 70%, #0b1014 100%);
-    color:var(--text);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    text-align: center;
+    background: var(--bg);
+    color: var(--text);
+    margin:0;
   }
-  img,svg,video,canvas{ max-width:100%; height:auto }
-  button,select,input{ font-size:17px; border-radius:14px; border:1px solid var(--border); background:#0f151c; color:var(--text) }
-  input[type="number"]{ text-align:center; font-weight:800; background:#0c1218 }
-  input[type="range"]{ width:100%; appearance:none; height:28px; background:transparent; padding:0; margin:0 }
-  input[type="range"]::-webkit-slider-runnable-track{ height:4px; background:linear-gradient(90deg, var(--accent2), #93a1b4); border-radius:999px }
-  input[type="range"]::-webkit-slider-thumb{ appearance:none; width:22px; height:22px; border-radius:50%; background:#e7edf6; border:1px solid #c9d2de; margin-top:-9px }
-  input[type="range"]::-moz-range-track{ height:4px; background:linear-gradient(90deg, var(--accent2), #93a1b4); border-radius:999px }
-  input[type="range"]::-moz-range-thumb{ width:22px; height:22px; border-radius:50%; background:#e7edf6; border:1px solid #c9d2de }
-
-  /* ===== Layout ===== */
-  h1{ margin: 18px 0 8px; font-size: 22px; letter-spacing:.2px; color:#eef3fb; text-align:center }
-  .app{ max-width:520px; margin:0 auto; padding: max(10px, env(safe-area-inset-top)) 14px 24px }
-  .panel{
-    background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02)) , var(--panel);
-    border:1px solid var(--border); border-radius:20px; padding:16px; margin:14px auto 18px;
-    width:min(520px, 94vw); box-shadow: 0 10px 30px rgba(0,0,0,.35)
+  h1 { margin: 16px 0 6px; font-size: 22px; color: var(--silver); }
+  .app{ max-width:480px; margin:0 auto; padding:14px; }
+  .panel {
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:14px;
+    margin:14px auto;
+    width:min(480px, 94vw);
+    box-shadow:0 12px 28px rgba(0,0,0,.25)
   }
-  .row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px }
-  .section{ display:grid; gap:10px; margin-top:10px }
-  .divider{ height:1px; background:linear-gradient(90deg, transparent, var(--divider), transparent); margin:12px 0 }
-
-  /* ===== BPM (pill controls, centered) ===== */
-  .bpmBlock{ display:grid; grid-template-columns: 56px 1fr 56px; gap:10px; align-items:center; justify-items:center }
-  .bpmBlock .icon-btn{ width:56px; height:56px; font-size:24px; border-radius:999px; background:linear-gradient(180deg,#121a23,#0e141b); border:1px solid var(--border); box-shadow:0 2px 0 rgba(0,0,0,.28) }
-  .bpmBlock .icon-btn:active{ transform:translateY(1px) }
-  #bpm{ width:120px; height:56px; font-size:22px; border:1px solid var(--border); border-radius:16px }
-
-  /* ===== Cards ===== */
-  .controlCard{ background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)), #0f151c; border:1px solid var(--border); border-radius:16px; padding:12px; flex:1; min-width:0 }
-  .label{ text-align:left; color:var(--accent2); font-size:12px; letter-spacing:.3px; text-transform:uppercase }
-  .pair{ display:grid; grid-template-columns: 1fr auto 1fr; gap:8px; align-items:center }
-  .pair > *{ min-width:0 }  /* prevent overflow on narrow screens */
-
-  /* ===== Segmented (beat unit option, kept for future) ===== */
-  .seg{ display:flex; background:#0d141c; border:1px solid var(--border); border-radius:14px; overflow:hidden }
-  .seg button{ flex:1; padding:10px 10px; font-size:15px; border:0; background:transparent; color:var(--text) }
-  .seg button.active{ background:rgba(125,211,252,.18); color:#eaf6ff }
-
-  /* ===== Kit grid (top 4 / bottom 3) ===== */
-  .kitGrid{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px }
-  .kitGrid-bottom{ display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:10px }
-  .chip{ display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); background:#0f151c; border-radius:14px; min-height:48px; min-width:0 }
-  .chip input{ transform:scale(1.1) }
-
-  /* ===== Buttons ===== */
-  .btn{ padding:14px 18px; border-radius:14px; border:1px solid var(--border); background:#0f151c; color:var(--text) }
-  .btn.primary{ background:linear-gradient(180deg,#b9c5d3,#a7b5c6); border-color:#95a6ba; color:#0b1117; font-weight:800 } /* silver-ish */
-  .btn.danger{ background:#ab2a2a; border-color:#8f2121; color:#fff; font-weight:800 }
-
-  /* ===== Unlock overlay ===== */
-  #unlockOverlay{
-    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
-    background:rgba(4,6,10,.65); backdrop-filter: blur(5px); z-index:9999; padding:18px;
-    transition: opacity .25s ease; opacity:1; pointer-events:auto;
+  .row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px }
+  button, select, input { font-size: 18px; border-radius: 14px; border: 1px solid var(--border); background:#0d131b; color:var(--text) }
+  input[type="number"]{ text-align:center; font-weight:800; background:#0b1118 }
+  input[type="range"]{ flex:1; min-width:0 }
+  .btn.primary{ background:var(--accent2); border-color:#0e8f6d; color:#00160f; font-weight:900 }
+  .btn.danger{ background:var(--danger); border-color:#b91c1c; color:#fff; font-weight:800 }
+  .icon-btn { width:48px; height:48px; font-size:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  /* BPM block */
+  .bpmBlock{ display:flex; align-items:center; gap:10px; justify-content:center }
+  #bpm{ width:80px; height:48px; font-size:20px; }
+  /* Kit Grid */
+  .kitGrid { display:grid; grid-template-columns: repeat(4,1fr); gap:8px; margin-top:8px; }
+  .kitGrid-bottom { display:grid; grid-template-columns: repeat(3,1fr); gap:8px; margin-top:8px; }
+  /* Control Cards */
+  .controlCard{ background:#0c1218; border:1px solid var(--border); border-radius:14px; padding:10px; flex:1 }
+  .label{ text-align:left; color:var(--muted); font-size:13px }
+  /* Unlock overlay */
+  #unlockOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display:flex; align-items:center; justify-content:center;
+    flex-direction:column; z-index:999;
+    transition: opacity 0.3s ease;
   }
-  #unlockOverlay.hidden{ opacity:0; pointer-events:none; }
-  #unlockOverlay .card{ background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)), #0e141b; border:1px solid var(--border); color:var(--text); border-radius:22px; padding:18px 16px; max-width: 92vw; line-height: 1.65; box-shadow:0 16px 40px rgba(0,0,0,.35) }
-  #unlock{ display:block; width:100%; padding:18px; font-size:20px; border-radius:16px; background:linear-gradient(180deg, #cfd7e2, #b7c3d1); border:1px solid #9aa9bd; color:#0a0f14; font-weight:900; letter-spacing:.2px }
-  #unlock:active{ transform:translateY(1px) }
-
-  /* ===== Diagnostics ===== */
-  #diag{ text-align:left; margin: 0 auto; width:min(520px, 94vw) }
-  #diag pre{ white-space:pre-wrap; background:#0b1118; border:1px solid var(--border); border-radius:12px; padding:10px }
-
-  /* ===== Mobile tweaks ===== */
-  @media (max-width: 360px){
-    #bpm{ width:100px }
-    .bpmBlock{ grid-template-columns: 48px 1fr 48px }
-    .bpmBlock .icon-btn{ width:48px; height:48px }
-  }
+  #unlockOverlay.hidden { opacity:0; pointer-events:none; }
+  #unlock { font-size:22px; padding:14px 24px; border-radius:8px; background:var(--accent); color:white; border:0; }
 </style>
 </head>
 <body>
-  <div class="app">
-    <h1>Metronome Studio v4</h1>
-
-    <div class="panel" aria-label="Metronome Controls">
-      <!-- BPM -->
-      <div class="section">
-        <div class="label">テンポ</div>
-        <div class="bpmBlock">
-          <button id="bpmMinus" class="icon-btn" aria-label="BPM down">−</button>
-          <input id="bpm" type="number" value="100" min="20" max="300" inputmode="numeric" />
-          <button id="bpmPlus" class="icon-btn" aria-label="BPM up">＋</button>
-        </div>
+<div id="unlockOverlay">
+  <button id="unlock">Audioを有効化</button>
+</div>
+<div class="app">
+  <h1>Metronome Studio v4</h1>
+  <div class="panel">
+    <div class="bpmBlock">
+      <button id="bpmMinus" class="icon-btn">−</button>
+      <input id="bpm" type="number" value="100" min="20" max="300" />
+      <button id="bpmPlus" class="icon-btn">＋</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="controlCard">
+        <div class="label">拍子</div>
+        <input id="beats" type="number" value="4" min="1" max="12">
       </div>
-
-      <div class="divider" aria-hidden="true"></div>
-
-      <!-- Time signature & subdivision -->
-      <div class="row">
-        <div class="controlCard">
-          <div class="label">拍子（分子/分母）</div>
-          <div class="pair">
-            <input id="beats" type="number" value="4" min="1" max="12">
-            <span style="opacity:.6">/</span>
-            <input id="beatUnit" type="number" value="4" min="1" max="32">
-          </div>
-        </div>
-        <div class="controlCard">
-          <div class="label">細分</div>
-          <select id="subdiv">
-            <option value="quarter">4分</option>
-            <option value="eighth" selected>8分</option>
-            <option value="triplet">3連</option>
-            <option value="sixteenth">16分</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="section" style="margin-top:14px">
-        <div class="label">音量</div>
-        <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7">
-      </div>
-
-      <div class="divider" aria-hidden="true"></div>
-
-      <!-- Kit -->
-      <div class="section">
-        <div class="label">キット</div>
-        <div class="kitGrid">
-          <label class="chip"><input type="checkbox" id="kick" checked> Kick</label>
-          <label class="chip"><input type="checkbox" id="snare" checked> Snare</label>
-          <label class="chip"><input type="checkbox" id="hihat" checked> Hi-Hat</label>
-          <label class="chip"><input type="checkbox" id="tamb"> Tambourine</label>
-        </div>
-        <div class="kitGrid-bottom">
-          <label class="chip"><input type="checkbox" id="shaker"> Shaker</label>
-          <label class="chip"><input type="checkbox" id="conga"> Conga</label>
-          <label class="chip"><input type="checkbox" id="bongo"> Bongo</label>
-        </div>
-      </div>
-
-      <div class="row" style="margin-top:14px; justify-content:center">
-        <button id="start" class="btn primary">Start</button>
-        <button id="stop" class="btn danger">Stop</button>
+      <div class="controlCard">
+        <div class="label">細分</div>
+        <select id="subdiv">
+          <option value="quarter">4分</option>
+          <option value="eighth" selected>8分</option>
+          <option value="triplet">3連</option>
+          <option value="sixteenth">16分</option>
+        </select>
       </div>
     </div>
-
-    <details id="diag" class="panel"><summary>Diagnostics / Self-tests</summary><pre id="diaglog">Running…</pre></details>
-  </div>
-
-  <!-- Unlock overlay -->
-  <div id="unlockOverlay">
-    <div class="card">
-      <div style="font-weight:700;margin-bottom:10px">音声を有効化してください</div>
-      <div style="opacity:.85;margin-bottom:12px">最初に画面をタップ（または下のボタン）してブラウザのオーディオを許可します。</div>
-      <button id="unlock">🎵 Audioを有効化（タップ）</button>
+    <div class="row" style="margin-top:8px">
+      <label style="flex:1">音量: <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7"></label>
+    </div>
+    <div class="kitGrid">
+      <label><input type="checkbox" id="kick" checked> Kick</label>
+      <label><input type="checkbox" id="snare" checked> Snare</label>
+      <label><input type="checkbox" id="hihat" checked> Hi-Hat</label>
+      <label><input type="checkbox" id="tamb"> Tambourine</label>
+    </div>
+    <div class="kitGrid-bottom">
+      <label><input type="checkbox" id="shaker"> Shaker</label>
+      <label><input type="checkbox" id="conga"> Conga</label>
+      <label><input type="checkbox" id="bongo"> Bongo</label>
+    </div>
+    <div class="row" style="margin-top:10px; justify-content:center">
+      <button id="start" class="btn primary">Start</button>
+      <button id="stop" class="btn danger">Stop</button>
     </div>
   </div>
-
+</div>
 <script>
-(() => {
-  // ===== Helpers =====
-  const onReady = (fn) => { if (document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn, { once: true }); };
-  const appendLog = (...args) => {
-    const pre = document.getElementById('diaglog');
-    if (!pre) return;
-    const line = args.map(a => (typeof a === 'string' ? a : (()=>{ try { return JSON.stringify(a); } catch { return String(a); } })())).join(' ');
-    pre.appendChild(document.createTextNode('\\n' + line)); // ← 改行は明示リテラル
-  };
-  const log = (...args) => { try { console.log('[Metronome]', ...args); } catch(_){} appendLog(...args); };
-  const el = (id) => { const n = document.getElementById(id); if (!n) throw new Error('Missing #' + id); return n; };
+let ctx, master, nextTime=0, bpm=100, beats=4, subdiv='eighth', isPlaying=false;
 
-  // ===== Audio & State =====
-  let ctx, master;
-  let bpm=100, beats=4, beatUnit=4, subdiv='eighth';
-  let playing=false, step=0, nextTime=0;
-  const schedAhead=0.14;
-
-  function initAudio(){
-    if (ctx) return ctx;
+function el(id){return document.getElementById(id);}
+function initAudio(){
+  if(!ctx){
     ctx = new (window.AudioContext||window.webkitAudioContext)();
     master = ctx.createGain();
-    master.gain.value = parseFloat(el('volume').value||'0.7');
-    const comp = ctx.createDynamicsCompressor();
-    comp.threshold.setValueAtTime(-12, ctx.currentTime);
-    comp.knee.setValueAtTime(30, ctx.currentTime);
-    comp.ratio.setValueAtTime(4, ctx.currentTime);
-    comp.attack.setValueAtTime(0.003, ctx.currentTime);
-    comp.release.setValueAtTime(0.25, ctx.currentTime);
-    master.connect(comp).connect(ctx.destination);
-    return ctx;
+    master.gain.value = parseFloat(el('volume').value);
+    master.connect(ctx.destination);
   }
-
-  // iOSでも確実に解放する同期版
-  function unlockAudioNow(){
-    initAudio();
-    try { ctx.resume(); } catch(e){}
-    try {
-      const s = ctx.createBufferSource();
-      s.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
-      s.connect(master);
-      s.start(0);
-    } catch(e) {}
-    const ov = document.getElementById('unlockOverlay');
-    if (ctx && ctx.state === 'running' && ov) {
-      ov.classList.add('hidden'); // フェード＆クリック無効
-    }
-    log('unlock:', ctx && ctx.state);
+}
+function unlockAudioNow(){
+  initAudio();
+  try{ ctx.resume(); }catch(e){}
+  try{
+    const s=ctx.createBufferSource();
+    s.buffer=ctx.createBuffer(1,1,ctx.sampleRate);
+    s.connect(master);
+    s.start(0);
+  }catch(e){}
+  if(ctx.state==='running'){
+    el('unlockOverlay').classList.add('hidden');
   }
+}
+el('unlock').addEventListener('click', unlockAudioNow, {passive:false});
+el('unlock').addEventListener('touchend', unlockAudioNow, {passive:false});
+document.addEventListener('pointerdown', ()=>{ if(!ctx||ctx.state!=='running') unlockAudioNow(); }, {passive:false});
 
-  function computeSecPerStep(_bpm,_beatUnit,_subdiv){
-    const spb = 60 / _bpm; // seconds per beat where beat = note of denominator
-    const stepsPerBeat = _subdiv==='quarter'?1:_subdiv==='eighth'?2:_subdiv==='triplet'?3:4;
-    return spb * (4/_beatUnit) / stepsPerBeat;
+el('bpmMinus').onclick=()=>{ el('bpm').value = Math.max(20, parseInt(el('bpm').value)-1); };
+el('bpmPlus').onclick=()=>{ el('bpm').value = Math.min(300, parseInt(el('bpm').value)+1); };
+el('volume').oninput=()=>{ if(master) master.gain.value = parseFloat(el('volume').value); };
+
+function playKick(t, vol=1){ const o=ctx.createOscillator(), g=ctx.createGain(); o.frequency.setValueAtTime(150,t); o.frequency.exponentialRampToValueAtTime(50,t+0.1); g.gain.setValueAtTime(1*vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.3); o.connect(g).connect(master); o.start(t); o.stop(t+0.3);}
+function playSnare(t, vol=1){ const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.2, ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1;} n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500; const g=ctx.createGain(); g.gain.setValueAtTime(1*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.2);}
+function playHihat(t, vol=1){ const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1;} n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000; const g=ctx.createGain(); g.gain.setValueAtTime(0.6*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05); n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.05);}
+function playTamb(t){ const grains=4; for(let k=0;k<grains;k++){ const delay=(k===0?0:(0.010+Math.random()*0.020)*k); const n=ctx.createBufferSource(); const len=(ctx.sampleRate*0.022)|0; const b=ctx.createBuffer(1,len,ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.exp(-i/(len*0.6)); } n.buffer=b; const bp1=ctx.createBiquadFilter(); bp1.type='bandpass'; bp1.frequency.value=7500+Math.random()*2000; bp1.Q.value=8; const bp2=ctx.createBiquadFilter(); bp2.type='bandpass'; bp2.frequency.value=12000; bp2.Q.value=3; const g=ctx.createGain(); g.gain.setValueAtTime(0.55,t+delay); g.gain.exponentialRampToValueAtTime(0.001,t+delay+0.08); n.connect(bp1).connect(bp2).connect(g).connect(master); n.start(t+delay); n.stop(t+delay+0.09); } }
+function playShaker(t){ const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.1, ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.exp(-i/(ctx.sampleRate*0.03)); } n.buffer=b; const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=5000; const g=ctx.createGain(); g.gain.setValueAtTime(0.4,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.1); n.connect(hp).connect(g).connect(master); n.start(t); n.stop(t+0.1);}
+function playConga(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.frequency.setValueAtTime(500,t); g.gain.setValueAtTime(0.8,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.2); o.connect(g).connect(master); o.start(t); o.stop(t+0.2);}
+function playBongo(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.frequency.setValueAtTime(800,t); g.gain.setValueAtTime(0.6,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.connect(g).connect(master); o.start(t); o.stop(t+0.15);}
+
+function scheduleStep(i,t){
+  const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
+  const beatIndex = Math.floor(i/stepsPerBeat);
+  const stepInBeat = i % stepsPerBeat;
+  const beatInBar = beatIndex % beats;
+  let kickLevel=0.65;
+  if(beatInBar===0) kickLevel=1.00;
+  else if(beats>=4 && beatInBar===Math.floor(beats/2)) kickLevel=0.85;
+  else if(beatInBar===1) kickLevel=0.60;
+  else if(beatInBar===3) kickLevel=0.55;
+  const snareLevel=(beatInBar%2===1)?(beatInBar===1?0.72:0.65):0;
+  const HH=[0.75,0.55,0.65,0.50];
+  const hihatLevel=HH[beatInBar%HH.length]||0.60;
+  const addDownbeatClick=(beatInBar===0 && stepInBeat===0);
+  if(stepInBeat===0){
+    if(el('kick').checked) playKick(t,kickLevel);
+    if(el('snare').checked && snareLevel>0) playSnare(t,snareLevel);
+    if(el('conga').checked && beatInBar%2===0) playConga(t);
   }
-
-  // ===== Instruments (vol-capable for accenting) =====
-  function playKick(t, vol=1){
-    const osc = ctx.createOscillator(); const g = ctx.createGain();
-    osc.frequency.setValueAtTime(150,t);
-    osc.frequency.exponentialRampToValueAtTime(50,t+0.1);
-    g.gain.setValueAtTime(1*vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t+0.3);
-    osc.connect(g).connect(master); osc.start(t); osc.stop(t+0.3);
+  if(el('hihat').checked) playHihat(t,hihatLevel);
+  if(el('tamb').checked) playTamb(t);
+  if(el('shaker').checked) playShaker(t);
+  if(el('bongo').checked){
+    const perBeat=2; const eighth=(stepInBeat*perBeat)/stepsPerBeat;
+    if(Number.isInteger(eighth)&&(eighth%2===1)) playBongo(t);
   }
-  function playSnare(t, vol=1){
-    const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.2, ctx.sampleRate);
-    const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; }
-    n.buffer=b; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=1500;
-    const g=ctx.createGain(); g.gain.setValueAtTime(1*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.2);
-    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.2);
+  if(addDownbeatClick){
+    try{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='square'; o.frequency.setValueAtTime(1550,t);
+      g.gain.setValueAtTime(0.22,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.05);
+      o.connect(g).connect(master); o.start(t); o.stop(t+0.06);
+    }catch(_){}
   }
-  function playHihat(t, vol=1){
-    const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
-    const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b;
-    const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7000;
-    const g=ctx.createGain(); g.gain.setValueAtTime(0.6*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
-    n.connect(f).connect(g).connect(master); n.start(t); n.stop(t+0.05);
+}
+
+function scheduler(){
+  while(nextTime < ctx.currentTime + 0.1){
+    const step = Math.floor((nextTime - ctx.baseTime) / (60/bpm/subdivFactor()));
+    scheduleStep(step, nextTime);
+    nextTime += 60 / bpm / subdivFactor();
   }
-
-  // Tambourine: multiple bright grains (distinct from Hi-Hat)
-  function playTamb(t){
-    const grains = 4;
-    for (let k = 0; k < grains; k++) {
-      const delay = (k === 0 ? 0 : (0.010 + Math.random()*0.020) * k);
-      const n = ctx.createBufferSource();
-      const len = (ctx.sampleRate * 0.022) | 0;
-      const b = ctx.createBuffer(1, len, ctx.sampleRate);
-      const d = b.getChannelData(0);
-      for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2 - 1) * Math.exp(-i / (len * 0.6));
-      n.buffer = b;
-      const bp1 = ctx.createBiquadFilter(); bp1.type='bandpass'; bp1.frequency.value = 7500 + Math.random()*2000; bp1.Q.value = 8;
-      const bp2 = ctx.createBiquadFilter(); bp2.type='bandpass'; bp2.frequency.value = 12000; bp2.Q.value = 3;
-      const g = ctx.createGain(); g.gain.setValueAtTime(0.55, t + delay); g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.08);
-      n.connect(bp1).connect(bp2).connect(g).connect(master);
-      n.start(t + delay); n.stop(t + delay + 0.09);
-    }
-  }
-  function playShaker(t){ const n=ctx.createBufferSource(); const len=(ctx.sampleRate*0.05)|0; const b=ctx.createBuffer(1,len,ctx.sampleRate); const d=b.getChannelData(0); for(let i=0;i<d.length;i++){ d[i]=Math.random()*2-1; } n.buffer=b; const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3000; bp.Q.value=1.2; const g=ctx.createGain(); g.gain.setValueAtTime(0.6,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.06); n.connect(bp).connect(g).connect(master); n.start(t); n.stop(t+0.07); }
-  function playConga(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(400,t); g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.2); o.connect(g).connect(master); o.start(t); o.stop(t+0.2); }
-  function playBongo(t){ const o=ctx.createOscillator(); const g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(600,t); g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.connect(g).connect(master); o.start(t); o.stop(t+0.15); }
-
-  // ===== Scheduler with accents =====
-  function scheduleStep(i,t){
-    const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
-    const beatIndex = Math.floor(i/stepsPerBeat);
-    const stepInBeat = i % stepsPerBeat;
-    const beatInBar = beatIndex % beats; // 0..(beats-1)
-
-    // Accent plan (default for 4/4): 1=strong, 2=weak, 3=mid, 4=weak
-    let kickLevel = 0.7;                     // base weak
-    if (beatInBar === 0) kickLevel = 1.0;    // downbeat strong
-    else if (beats>=4 && beatInBar === Math.floor(beats/2)) kickLevel = 0.85; // mid-bar (3rd in 4/4)
-
-    const addDownbeatClick = (beatInBar === 0 && stepInBeat===0); // optional helper click
-
-    // On-beat events
-    if(stepInBeat===0){
-      if(el('kick').checked) playKick(t, kickLevel);
-      // Snare on 2 & 4 but a bit softer to avoid 2/2 feel
-      if(el('snare').checked && (beatInBar%2===1)) playSnare(t, 0.8);
-    }
-
-    // Continuous textures
-    if(el('hihat').checked)  playHihat(t, 0.7);
-    if(el('tamb').checked)   playTamb(t);
-    if(el('shaker').checked) playShaker(t);
-
-    if(el('conga').checked && stepInBeat===0 && beatInBar%2===0) playConga(t);
-    if(el('bongo').checked){
-      const perBeat=2; const eighth=(stepInBeat*perBeat)/stepsPerBeat;
-      if(Number.isInteger(eighth) && (eighth%2===1)) playBongo(t);
-    }
-
-    // Optional: bright downbeat click for clear bar start
-    if (addDownbeatClick){
-      try{
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type='square'; o.frequency.setValueAtTime(1550, t);
-        g.gain.setValueAtTime(0.22, t); g.gain.exponentialRampToValueAtTime(0.001, t+0.05);
-        o.connect(g).connect(master); o.start(t); o.stop(t+0.06);
-      }catch(_){}
-    }
-  }
-
-  function scheduler(){ while(nextTime < ctx.currentTime + schedAhead){ scheduleStep(step, nextTime); nextTime += computeSecPerStep(bpm, beatUnit, subdiv); step++; } }
-
-  async function play(){
-    // モバイルで未解放なら即時解放を先に実施（awaitは使わない）
-    if (!ctx || (ctx && ctx.state !== 'running')) unlockAudioNow();
-    bpm = parseInt(el('bpm').value||'100',10);
-    beats = parseInt(el('beats').value||'4',10);
-    beatUnit = parseInt(el('beatUnit').value||'4',10);
-    subdiv = (el('subdiv').value||'eighth');
-    playing=true; step=0; nextTime=ctx.currentTime+0.05;
-    (function tick(){ if(!playing) return; scheduler(); requestAnimationFrame(tick); })();
-  }
-  function stop(){ playing=false; }
-
-  onReady(()=>{
-    // Wire controls
-    const unlockBtn = document.getElementById('unlock');
-    if (unlockBtn){
-      unlockBtn.addEventListener('click', unlockAudioNow, { passive:false });
-      unlockBtn.addEventListener('touchend', unlockAudioNow, { passive:false });
-    }
-    el('start').addEventListener('click', play, { passive:false });
-    el('stop').addEventListener('click', stop, { passive:false });
-    el('volume').addEventListener('input', (e)=>{ if(master) master.gain.value=parseFloat(e.target.value||'0.7'); });
-    document.getElementById('bpmMinus').addEventListener('click', ()=>{ const v=Math.max(20, parseInt(el('bpm').value||'100',10)-1); el('bpm').value=v; }, { passive:false });
-    document.getElementById('bpmPlus').addEventListener('click', ()=>{ const v=Math.min(300, parseInt(el('bpm').value||'100',10)+1); el('bpm').value=v; }, { passive:false });
-
-    // Gesture unlock fallback (entire page)
-    document.addEventListener('pointerdown', ()=>{ if(!ctx || ctx.state!=='running'){ unlockAudioNow(); } }, { passive:false });
-
-    document.addEventListener('visibilitychange', ()=>{ if(ctx && document.visibilityState==='visible' && ctx.state==='suspended'){ ctx.resume(); } });
-
-    // ===== Self-tests =====
-    const results = [];
-    const pass = (name)=> results.push('PASS  ' + name);
-    const fail = (name, extra='')=> results.push('FAIL  ' + name + (extra? ' — ' + extra : ''));
-
-    try {
-      const required = ['bpm','beats','beatUnit','subdiv','start','stop','unlock','volume','kick','snare','hihat'];
-      const ok = required.every(id => !!document.getElementById(id));
-      ok ? pass('DOM elements present: ' + required.join(', ')) : fail('DOM elements missing', required.filter(id=>!document.getElementById(id)).join(', '));
-    } catch(e){ fail('DOM presence check', e.message); }
-
-    try {
-      const s1 = computeSecPerStep(120,4,'eighth');
-      const s2 = computeSecPerStep(60,4,'quarter');
-      const s3 = computeSecPerStep(90,8,'sixteenth');
-      Math.abs(s1-0.25)<1e-6 ? pass('secPerStep(120,4,eighth)=0.25s') : fail('secPerStep case1', 'got '+s1);
-      Math.abs(s2-1.0)<1e-6 ? pass('secPerStep(60,4,quarter)=1.0s') : fail('secPerStep case2', 'got '+s2);
-      Math.abs(s3-(60/90*(4/8)/4))<1e-6 ? pass('secPerStep(90,8,sixteenth) math ok') : fail('secPerStep case3', 'got '+s3);
-    } catch(e){ fail('Timing math', e.message); }
-
-    try { initAudio(); pass('AudioContext created (no resume)'); } catch(e){ fail('AudioContext init', e.message); }
-
-    try { log('TEST', { a:1 }); pass('log basic works'); } catch(e){ fail('log basic failed', e.message); }
-    try { const circular={}; circular.self=circular; log('circular', circular); pass('log circular fallback works'); } catch(e){ fail('log circular', e.message); }
-
-    const pre = document.getElementById('diaglog');
-    if (pre) pre.textContent = (pre.textContent||'') + '\n' + results.join('\n');  // ← 改行は明示リテラル
-  });
-})();
+  if(isPlaying) setTimeout(scheduler, 25);
+}
+function subdivFactor(){
+  return subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
+}
+el('start').onclick=()=>{
+  initAudio(); bpm=parseInt(el('bpm').value); beats=parseInt(el('beats').value); subdiv=el('subdiv').value;
+  nextTime = ctx.currentTime + 0.05;
+  ctx.baseTime = nextTime;
+  isPlaying=true;
+  scheduler();
+};
+el('stop').onclick=()=>{ isPlaying=false; };
 </script>
 </body>
 </html>
