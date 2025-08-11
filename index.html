@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Metronome — iOS Safe</title>
+  <title>Metronome — iOS Debug Build</title>
   <style>
     :root { color-scheme: light dark; }
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0e1116;color:#e6edf3;}
-    .wrap{max-width:720px;margin:40px auto;padding:24px}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;margin:0;background:#0e1116;color:#e6edf3}
+    .wrap{max-width:760px;margin:40px auto;padding:24px}
     h1{font-size:22px;margin:0 0 16px}
     .card{background:#161b22;border:1px solid #30363d;border-radius:16px;padding:16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
     .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
@@ -18,17 +18,37 @@
     button:disabled{opacity:.5}
     .hint{opacity:.8;font-size:13px;margin-top:8px}
 
-    /* iOS audio unlock overlay */
+    /* unlock overlay */
     .unlock{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:9999}
     .unlock button{font-size:18px;padding:14px 18px;border-radius:14px;background:#238636;border:1px solid #2ea043;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.35)}
     .hidden{display:none}
+
+    /* debug panel */
+    .dbg{position:sticky;top:0;background:#0b0f14;border-bottom:1px solid #30363d;padding:8px 12px;font-size:13px;display:flex;gap:12px;align-items:center}
+    .badge{padding:2px 8px;border-radius:999px;border:1px solid #30363d;background:#11161d}
+    .ok{border-color:#1f6feb}
+    #meter{width:120px;height:10px;background:#222;border-radius:6px;overflow:hidden}
+    #meter > i{display:block;height:100%;width:0;background:#2ea043}
+    #led{width:18px;height:18px;border-radius:999px;background:#3d434b;box-shadow:0 0 0 2px #30363d inset}
+    #led.on{background:#ffa657;box-shadow:0 0 16px 3px rgba(255,166,87,.6)}
+    .warn{background:#3b1d1d;border:1px solid #7f1d1d;padding:8px 12px;border-radius:10px}
   </style>
 </head>
 <body>
   <div id="unlock" class="unlock"><button id="unlockBtn">Audioを有効化（タップ）</button></div>
 
+  <div class="dbg">
+    <span class="badge">ctx:<b id="state">-</b></span>
+    <span class="badge">t:<b id="time">0.000</b></span>
+    <span class="badge">next:<b id="next">-</b></span>
+    <span class="badge ok">beat:<b id="beat">-</b></span>
+    <span id="meter" title="audio level"><i></i></span>
+    <span id="led" title="accent LED"></span>
+    <button id="selftest">Self Test</button>
+  </div>
+
   <div class="wrap">
-    <h1>Metronome — iOS Safe</h1>
+    <h1>Metronome — iPhone無音原因の切り分け版</h1>
     <div class="card">
       <div class="row" style="margin-bottom:12px">
         <label>BPM</label>
@@ -42,146 +62,154 @@
           <option value="6">6/8</option>
         </select>
         <label>音量</label>
-        <input id="vol" type="range" min="0" max="1" value="0.6" step="0.01" />
+        <input id="vol" type="range" min="0" max="1" value="0.7" step="0.01" />
       </div>
       <div class="row">
         <button id="start" class="primary">Start</button>
         <button id="stop">Stop</button>
       </div>
-      <div class="hint">iPhoneでは最初に「Audioを有効化」をタップしてください。ホーム画面に追加すると全画面で使えます。</div>
+      <div id="warn" class="warn hidden">音声レベルが検出できません。iPhoneの音量/出力先（AirPlay）/サイレントスイッチを確認し、画面を1回タップしてから「Self Test」を押してください。</div>
+      <div class="hint">デバッグ表示：上部のLEDは拍頭で点灯、緑バーは実オーディオ出力のレベルです。ctxがrunning、Self Testでバーが動けば音系は動作しています。</div>
     </div>
   </div>
 
 <script>
 (function(){
-  // ====== Audio bootstrap (iOS 安全) ======
   const AC = window.AudioContext || window.webkitAudioContext;
-  let ctx = null, master = null;
+  let ctx = null, master = null, analyser = null;
+
+  const $ = id => document.getElementById(id);
+  const S = { state: $('state'), time: $('time'), next: $('next'), beat: $('beat') };
+  const meterBar = $('meter').firstElementChild;
+  const led = $('led');
+  const warn = $('warn');
 
   function ensureAudio(){
     if (!ctx) {
-      ctx = new AC({ latencyHint: 'interactive' });
+      try{
+        ctx = new AC({ latencyHint: 'interactive' });
+      }catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
       master = ctx.createGain();
-      master.gain.value = parseFloat(document.getElementById('vol').value || '0.6');
+      master.gain.value = parseFloat($('vol').value || '0.7');
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      master.connect(analyser); // meterに分岐
       master.connect(ctx.destination);
-      // 無音1サンプルを再生してiOSを確実に解放
+      // iOS解放: 無音1サンプル再生
       const b = ctx.createBuffer(1, 1, ctx.sampleRate);
       const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
     }
     if (ctx.state === 'suspended') ctx.resume();
   }
 
-  function showUnlock(v){
-    document.getElementById('unlock').classList.toggle('hidden', !!v);
-  }
+  function showUnlock(v){ $('unlock').classList.toggle('hidden', !!v); }
 
-  const unlockBtn = document.getElementById('unlockBtn');
-  const unlockOnce = () => { ensureAudio(); showUnlock(true); remAll(); };
-  const evts = ['touchstart','pointerup','click'];
-  function remAll(){ evts.forEach(e=>window.removeEventListener(e, unlockOnce, true)); }
-  evts.forEach(e=>window.addEventListener(e, unlockOnce, { capture:true }));
-  unlockBtn.addEventListener('click', unlockOnce, { once:true });
+  const unlockOnce = () => { ensureAudio(); showUnlock(true); removeUnlockListeners(); };
+  const unlockEvents = ['touchstart','pointerup','click'];
+  function removeUnlockListeners(){ unlockEvents.forEach(e=>window.removeEventListener(e, unlockOnce, true)); }
+  unlockEvents.forEach(e=>window.addEventListener(e, unlockOnce, { capture:true }));
+  $('unlockBtn').addEventListener('click', unlockOnce, { once:true });
 
-  // ====== Click sound buffers ======
-  let clickHi = null, clickLo = null;
-  function makeClickBuffer(freq = 2000, dur = 0.02){
-    const len = Math.max(1, Math.floor((ctx ? ctx.sampleRate : 48000) * dur));
-    const buffer = (ctx || { createBuffer: (ch, l, sr) => new (window.OfflineAudioContext||window.webkitOfflineAudioContext)(1, l, sr).createBuffer(ch, l, sr) }).createBuffer(1, len, (ctx ? ctx.sampleRate : 48000));
-    const data = buffer.getChannelData(0);
-    for (let i=0;i<len;i++){
-      const t = i/ (ctx ? ctx.sampleRate : 48000);
-      // 短い指数フェードのサイン + 少量ノイズでクリック感
-      const env = Math.exp(-40*t);
-      const sine = Math.sin(2*Math.PI*freq*t);
-      const noise = (Math.random()*2-1)*0.1;
-      data[i] = (sine*0.9 + noise)*env;
+  // ====== Debug meter loop ======
+  function loop(){
+    if (ctx){
+      S.state.textContent = ctx.state;
+      S.time.textContent = ctx.currentTime.toFixed(3);
+      const arr = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(arr);
+      // 標本のRMSからメータに変換
+      let sum = 0; for (let i=0;i<arr.length;i++){ const v = (arr[i]-128)/128; sum += v*v; }
+      const rms = Math.sqrt(sum/arr.length);
+      meterBar.style.width = Math.min(1, rms*4) * 120 + 'px';
+      warn.classList.toggle('hidden', rms>0.01 || !started);
     }
-    return buffer;
+    requestAnimationFrame(loop);
   }
+  requestAnimationFrame(loop);
 
-  function prepareBuffers(){
+  // ====== Click buffers（＋Oscillator fallback） ======
+  let clickHi = null, clickLo = null;
+  function makeBuffer(freq, dur){
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<len;i++){
+      const t = i/ctx.sampleRate;
+      const env = Math.exp(-45*t);
+      const sine = Math.sin(2*Math.PI*freq*t);
+      data[i] = sine*env;
+    }
+    return buf;
+  }
+  function prepare(){
     if (!ctx) ensureAudio();
-    clickHi = makeClickBuffer(2400, 0.02);
-    clickLo = makeClickBuffer(1600, 0.02);
+    clickHi = makeBuffer(2400, 0.02);
+    clickLo = makeBuffer(1600, 0.02);
   }
-
-  function playClick(accent){
-    const src = ctx.createBufferSource();
-    src.buffer = accent ? clickHi : clickLo;
-    const g = ctx.createGain();
-    g.gain.value = accent ? 0.9 : 0.6;
-    src.connect(g); g.connect(master);
-    src.start();
+  function scheduleClick(when, accent){
+    if (!clickHi) prepare();
+    try{
+      const src = ctx.createBufferSource();
+      src.buffer = accent ? clickHi : clickLo;
+      const g = ctx.createGain(); g.gain.value = accent ? 0.9 : 0.6;
+      src.connect(g); g.connect(master);
+      src.start(when);
+    }catch(e){
+      // 予備：Oscillatorで代用
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain(); g.gain.setValueAtTime(accent?0.5:0.35, when);
+      g.gain.exponentialRampToValueAtTime(0.0001, when+0.05);
+      osc.frequency.setValueAtTime(accent?1200:800, when);
+      osc.connect(g); g.connect(master);
+      osc.start(when); osc.stop(when+0.06);
+    }
   }
 
   // ====== Scheduler ======
-  let nextNoteTime = 0; // seconds (ctx time)
-  let currentBeat = 0;
-  let scheduleTimer = null;
-  const lookahead = 25/1000; // 25ms
-  const scheduleAheadTime = 0.1; // 100ms
+  let nextNoteTime = 0, currentBeat = 0, timer = null, started = false;
+  const lookahead = 0.025, ahead = 0.1;
+
+  function getBeats(){ return parseInt($('beats').value,10)||4; }
+  function bpm(){ return Math.min(300, Math.max(20, parseInt($('bpm').value,10)||120)); }
 
   function nextNote(){
-    const bpm = clamp(parseInt(document.getElementById('bpm').value, 10) || 120, 20, 300);
-    const secPerBeat = 60.0 / bpm;
+    const secPerBeat = 60 / bpm();
     nextNoteTime += secPerBeat;
-    currentBeat = (currentBeat + 1) % getBeats();
+    currentBeat = (currentBeat+1) % getBeats();
   }
-
-  function getBeats(){ return parseInt(document.getElementById('beats').value, 10) || 4; }
-
   function scheduler(){
-    while (nextNoteTime < ctx.currentTime + scheduleAheadTime){
+    while (nextNoteTime < ctx.currentTime + ahead){
       const when = nextNoteTime;
       const accent = (currentBeat === 0);
       scheduleClick(when, accent);
+      // 視覚LEDも同期
+      const delay = Math.max(0, (when - ctx.currentTime) * 1000);
+      setTimeout(()=>{ led.classList.add('on'); setTimeout(()=>led.classList.remove('on'), 80); S.beat.textContent = currentBeat+1; }, delay);
+      S.next.textContent = when.toFixed(3);
       nextNote();
     }
   }
-
-  function scheduleClick(when, accent){
-    const src = ctx.createBufferSource();
-    src.buffer = accent ? clickHi : clickLo;
-    const g = ctx.createGain();
-    g.gain.value = accent ? 0.9 : 0.6;
-    src.connect(g); g.connect(master);
-    src.start(when);
-  }
-
   function start(){
-    ensureAudio();
-    prepareBuffers();
-    const bpm = clamp(parseInt(document.getElementById('bpm').value, 10) || 120, 20, 300);
-    const secPerBeat = 60.0 / bpm;
-    nextNoteTime = ctx.currentTime + 0.05; // 50ms 後に最初の音
-    currentBeat = getBeats() - 1; // 最初はアクセントから
-    if (scheduleTimer) clearInterval(scheduleTimer);
-    scheduleTimer = setInterval(scheduler, lookahead * 1000);
-    document.getElementById('start').disabled = true;
-    document.getElementById('stop').disabled = false;
+    ensureAudio(); prepare();
+    nextNoteTime = ctx.currentTime + 0.05;
+    currentBeat = getBeats()-1; // 最初はアクセント
+    if (timer) clearInterval(timer);
+    timer = setInterval(scheduler, lookahead*1000);
+    started = true; $('start').disabled = true; $('stop').disabled = false;
   }
-
   function stop(){
-    if (scheduleTimer) clearInterval(scheduleTimer);
-    scheduleTimer = null;
-    document.getElementById('start').disabled = false;
-    document.getElementById('stop').disabled = true;
+    if (timer) clearInterval(timer); timer=null; started=false;
+    $('start').disabled = false; $('stop').disabled = true;
   }
-
-  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
   // ====== UI wiring ======
-  const bpm = document.getElementById('bpm');
-  const bpmRange = document.getElementById('bpmRange');
-  bpm.addEventListener('input', () => bpmRange.value = bpm.value);
-  bpmRange.addEventListener('input', () => bpm.value = bpmRange.value);
-  document.getElementById('vol').addEventListener('input', (e)=>{ if(master) master.gain.value = parseFloat(e.target.value); });
-  document.getElementById('start').addEventListener('click', ()=>{ ensureAudio(); start(); });
-  document.getElementById('stop').addEventListener('click', stop);
-
-  // 画面非表示時は安全に停止（モバイルの省電力対策）
+  $('bpm').addEventListener('input', e=> $('bpmRange').value = e.target.value);
+  $('bpmRange').addEventListener('input', e=> $('bpm').value = e.target.value);
+  $('vol').addEventListener('input', e=> { if (master) master.gain.value = parseFloat(e.target.value); });
+  $('start').addEventListener('click', ()=>{ ensureAudio(); start(); });
+  $('stop').addEventListener('click', stop);
   document.addEventListener('visibilitychange', ()=>{ if (document.hidden) stop(); });
-
+  $('selftest').addEventListener('click', ()=>{ ensureAudio(); prepare(); scheduleClick(ctx.currentTime+0.01, true); scheduleClick(ctx.currentTime+0.2, false); });
 })();
 </script>
 </body>
