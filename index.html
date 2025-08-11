@@ -34,38 +34,34 @@
 
 <script>
 (function(){
-  // ===== 基本セットアップ =====
   const AC = window.AudioContext || window.webkitAudioContext;
-  let ctx = null, master = null;
+  let ctx = null, master = null, analyser = null;
   const $ = id => document.getElementById(id);
   const status = $('status');
+  const meterBar = document.querySelector('#meter > i');
+
   function log(s){ status.textContent = '状態: ' + s; }
 
   function ensureAudio(){
     if (!ctx) {
-      try { ctx = new AC({latencyHint:'interactive'}); }
-      catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
-      master = ctx.createGain();
-      master.gain.value = 0.6;
+      try { ctx = new AC({latencyHint:'interactive'}); } catch(e){ alert('AudioContext作成に失敗: '+e.message); return; }
+      master = ctx.createGain(); master.gain.value = 0.9; // 大きめに
       master.connect(ctx.destination);
-      // iOS解放の足がかり：無音1サンプルを鳴らす
-      const b = ctx.createBuffer(1, 1, ctx.sampleRate);
-      const s = ctx.createBufferSource(); s.buffer = b; s.connect(master); s.start(0);
+      analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
+      master.connect(analyser);
+      // 無音1サンプルで起動
+      const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0);
     }
   }
 
-  // ===== オーディオ解放（オーバーレイ） =====
   async function unlockOnce(e){
     e && e.preventDefault && e.preventDefault();
     ensureAudio(); if (!ctx) return;
     try { if (ctx.state === 'suspended') await ctx.resume(); } catch(_){}
-    // resume直後に再度無音を鳴らすと安定
     try{ const b = ctx.createBuffer(1,1,ctx.sampleRate); const s = ctx.createBufferSource(); s.buffer=b; s.connect(master); s.start(0); }catch(_){}
     if (ctx.state === 'running') {
       $('unlock').classList.add('hidden');
-      window.removeEventListener('touchstart', unlockOnce, true);
-      window.removeEventListener('pointerdown', unlockOnce, true);
-      window.removeEventListener('click', unlockOnce, true);
+      ['touchstart','pointerdown','click'].forEach(ev=> window.removeEventListener(ev, unlockOnce, true));
       log('解放済み（running）');
     } else {
       log('解放できず（'+ctx.state+'）');
@@ -76,41 +72,62 @@
   window.addEventListener('pointerdown', unlockOnce, {capture:true, passive:false});
   window.addEventListener('click', unlockOnce, {capture:true});
 
-  // ===== テスト音（WebAudio） =====
-  function beep(accent, when){
+  // レベルメーター
+  function meterLoop(){
+    if (analyser && meterBar){
+      const buf = new Uint8Array(analyser.fftSize);
+      analyser.getByteTimeDomainData(buf);
+      let sum=0; for (let i=0;i<buf.length;i++){ const v=(buf[i]-128)/128; sum += v*v; }
+      const rms = Math.sqrt(sum/buf.length);
+      meterBar.style.width = Math.min(1, rms*6) * 100 + '%';
+    }
+    requestAnimationFrame(meterLoop);
+  }
+  requestAnimationFrame(meterLoop);
+
+  // ==== テスト音（大きめ・長め）====
+  function beep(when){
     if (!ctx || ctx.state !== 'running') { log('AudioContextが未実行'); return; }
-    const len = Math.max(1, Math.floor(ctx.sampleRate * 0.08));
+    const dur = 0.5; // 0.5秒
+    const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
     const buf = ctx.createBuffer(1, len, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i=0;i<len;i++){
-      const t=i/ctx.sampleRate; const env=Math.exp(-18*t);
-      data[i] = Math.sin(2*Math.PI*(accent?880:440)*t)*env;
+      const t = i/ctx.sampleRate;
+      const env = Math.exp(-5*t); // 長め
+      data[i] = Math.sin(2*Math.PI*1000*t) * env; // 1kHz
     }
     const src = ctx.createBufferSource(); src.buffer = buf;
-    const g = ctx.createGain(); g.gain.value = accent?0.9:0.6;
+    const g = ctx.createGain(); g.gain.value = 1.0;
     src.connect(g); g.connect(master); src.start(when||0);
   }
 
-  function runSelfTest(){ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; log('Self Test 実行'); beep(true, t+0.02); beep(false, t+0.25); }
+  function runSelfTest(){ ensureAudio(); if (!ctx) return; const t = ctx.currentTime; log('Self Test 実行'); beep(t+0.02); }
   $('selftest').addEventListener('click', runSelfTest);
   $('selftest').addEventListener('touchend', function(e){ e.preventDefault(); runSelfTest(); }, {passive:false});
 
-  // ===== 連続トーン（長押し） =====
+  // 長押し連続トーン（さらに確実に聞こえる設定）
   let holdOsc=null, holdGain=null;
-  function startHold(){ ensureAudio(); if (!ctx) return; if (holdOsc) return; holdOsc = ctx.createOscillator(); holdGain = ctx.createGain(); holdOsc.frequency.value = 440; holdGain.gain.value = 0.25; holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); log('連続トーン開始'); }
+  function startHold(){ ensureAudio(); if (!ctx || holdOsc) return;
+    holdOsc = ctx.createOscillator(); holdGain = ctx.createGain();
+    holdOsc.type = 'sine'; holdOsc.frequency.value = 440;
+    holdGain.gain.value = 0.6;
+    holdOsc.connect(holdGain); holdGain.connect(master); holdOsc.start(); log('連続トーン開始');
+  }
   function stopHold(){ if (holdOsc){ holdOsc.stop(); holdOsc.disconnect(); holdGain.disconnect(); holdOsc=null; holdGain=null; log('連続トーン停止'); } }
   const holdBtn = $('holdtest');
-  holdBtn.addEventListener('touchstart', function(e){ e.preventDefault(); startHold(); }, {passive:false});
-  holdBtn.addEventListener('mousedown', function(e){ e.preventDefault(); startHold(); });
-  ['touchend','touchcancel','mouseup','mouseleave'].forEach(function(ev){ holdBtn.addEventListener(ev, function(e){ e.preventDefault(); stopHold(); }, {passive:false}); });
+  holdBtn.addEventListener('touchstart', e=>{ e.preventDefault(); startHold(); }, {passive:false});
+  holdBtn.addEventListener('mousedown', e=>{ e.preventDefault(); startHold(); });
+  ['touchend','touchcancel','mouseup','mouseleave'].forEach(ev=> holdBtn.addEventListener(ev, e=>{ e.preventDefault(); stopHold(); }, {passive:false}));
 
-  // ===== HTMLAudio 経路 =====
+  // HTMLAudio 経路
   $('htmlAudio').addEventListener('click', function(){
     log('HTMLAudioテスト 実行');
-    const audio = new Audio('data:audio/wav;base64,UklGRhQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAAAAAAD//w8AAP8PAAD/DwAA/w8AAP8PAAD/DwAA');
-    audio.play().then(function(){ log('HTMLAudio 再生開始'); }).catch(function(e){ alert('HTMLAudio 再生失敗: '+e.message); });
+    const audio = new Audio('data:audio/wav;base64,UklGRgAAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAZGF0YQAAAACAgICAgICAgICAgICAgICA'); // 短いPCM（無音に近い）→反応だけ確認
+    audio.play().then(()=>log('HTMLAudio 再生開始')).catch(e=>alert('HTMLAudio 再生失敗: '+e.message));
   });
 })();
 </script>
+
 </body>
 </html>
