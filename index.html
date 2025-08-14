@@ -6,37 +6,32 @@
 <title>エミリアピアノ教室 メトロノーム</title>
 <style>
   :root{
-    /* エミリアピアノ教室のブランドカラーに基づく配色 */
-    --primary: #7B4397;
-    --primary-light: #A569BD;
-    --secondary: #DC7633;
-    --accent: #E8B4D4;
-    --warm-cream: #FDF6E3;
-    --soft-pink: #FCE4EC;
-    
-    /* 背景グラデーション - 温かみのあるピンクベース */
-    --bg-gradient: linear-gradient(135deg, #FDF6E3 0%, #FCE4EC 30%, #F8E8F5 60%, #F3E5F5 100%);
-    
-    /* パネルとUI要素 */
-    --panel-bg: rgba(255, 255, 255, 0.92);
-    --panel-border: rgba(123, 67, 151, 0.15);
-    --card-bg: rgba(253, 246, 227, 0.8);
-    --card-border: rgba(220, 118, 51, 0.2);
-    
-    /* テキストカラー */
+    /* === カラーパレット（LPの世界観を反映：温かいオレンジ系） === */
+    --primary: #DC7633;        /* メインのオレンジ */
+    --primary-strong: #C95F1D; /* 少し落ち着いた濃いオレンジ */
+    --primary-light: #F39C12;  /* 明るめのアクセント */
+    --accent: #FFD9B3;         /* クリームがかった淡いオレンジ */
+    --warm-cream: #FFF6EA;     /* 背景ベース */
+    --soft-rose: #FFEDE1;      /* 薄いピンクオレンジ寄り */
+
+    --bg-gradient: linear-gradient(135deg, var(--warm-cream) 0%, var(--soft-rose) 40%, #FFF1E6 100%);
+
+    --panel-bg: rgba(255, 255, 255, 0.94);
+    --panel-border: rgba(220, 118, 51, 0.18);
+    --card-bg: rgba(255, 246, 234, 0.9);
+    --card-border: rgba(220, 118, 51, 0.22);
+
     --text-dark: #2C1810;
     --text-medium: #5D4037;
     --text-light: #8D6E63;
-    --text-accent: #7B4397;
-    
-    /* シャドウ */
-    --shadow-primary: 0 8px 32px rgba(123, 67, 151, 0.15);
-    --shadow-warm: 0 4px 20px rgba(220, 118, 51, 0.12);
-    --shadow-soft: 0 2px 12px rgba(123, 67, 151, 0.1);
+
+    --shadow-primary: 0 8px 32px rgba(201, 95, 29, 0.12);
+    --shadow-warm: 0 4px 20px rgba(220, 118, 51, 0.14);
+    --shadow-soft: 0 2px 12px rgba(201, 95, 29, 0.10);
   }
-  
+
   *,*::before,*::after{ box-sizing:border-box }
-  
+
   html,body{
     margin:0; padding:0; width:100%; max-width:100%; overflow-x:hidden;
     background: var(--bg-gradient);
@@ -47,443 +42,161 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* 優雅な装飾パターン */
   .decorative-pattern {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 150px;
-    background: 
-      radial-gradient(circle at 20% 20%, rgba(123, 67, 151, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 40%, rgba(220, 118, 51, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 40% 80%, rgba(232, 180, 212, 0.04) 0%, transparent 50%);
-    z-index: -1;
+    position: fixed; top: 0; left: 0; right: 0; height: 150px; z-index: -1;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(220, 118, 51, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 80% 40%, rgba(255, 171, 64, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, rgba(255, 217, 179, 0.08) 0%, transparent 50%);
   }
 
-  .app{ 
-    max-width: 380px; 
-    margin: 0 auto; 
-    padding: max(20px, env(safe-area-inset-top) + 15px) 20px calc(env(safe-area-inset-bottom) + 20px);
-    position: relative;
-    z-index: 1;
-  }
+  .app{ max-width: 390px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top) + 15px) 20px calc(env(safe-area-inset-bottom) + 20px); position: relative; z-index: 1; }
 
-  .header {
-    text-align: center;
-    margin-bottom: 32px;
-    padding: 25px 0 15px;
-  }
-
+  .header { text-align: center; margin-bottom: 28px; padding: 20px 0 10px; }
   .title {
-    font-size: 28px;
-    font-weight: 700;
-    background: linear-gradient(45deg, var(--primary), var(--primary-light));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0 0 8px 0;
-    letter-spacing: 0.8px;
-    text-shadow: 0 2px 4px rgba(123, 67, 151, 0.1);
+    font-size: 26px; font-weight: 800; letter-spacing: 0.4px; margin: 0 0 6px 0;
+    background: linear-gradient(45deg, var(--primary-strong), var(--primary-light));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    text-shadow: 0 2px 6px rgba(201, 95, 29, 0.15);
   }
-
-  .subtitle {
-    font-size: 18px;
-    color: var(--text-medium);
-    margin: 0 0 6px 0;
-    font-weight: 600;
-    letter-spacing: 0.3px;
-  }
-
-  .author {
-    font-size: 12px;
-    color: var(--text-light);
-    opacity: 0.8;
-    font-weight: 400;
-    font-style: italic;
-  }
+  .subtitle { font-size: 17px; color: var(--text-medium); margin: 0 0 4px 0; font-weight: 700; }
+  .author   { font-size: 12px; color: var(--text-light); opacity: 0.9; font-style: italic; }
 
   .panel{
     background: var(--panel-bg);
     backdrop-filter: blur(12px);
     border: 1.5px solid var(--panel-border);
-    border-radius: 28px;
-    padding: 28px 24px;
-    margin: 0 auto 24px;
+    border-radius: 26px;
+    padding: 24px 20px;
+    margin: 0 auto 22px;
     box-shadow: var(--shadow-primary);
     position: relative;
-    overflow: hidden;
+    /* ▼ ドロップダウンが切れないように（重要修正） */
+    overflow: visible;
   }
-
   .panel::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent);
   }
 
-  .section { 
-    margin: 24px 0;
-  }
-
-  .section:first-child {
-    margin-top: 0;
-  }
+  .section { margin: 22px 0; }
+  .section:first-child { margin-top: 0; }
 
   .label {
-    font-size: 15px;
-    color: var(--text-accent);
-    margin-bottom: 14px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    letter-spacing: 0.2px;
+    font-size: 14px; color: var(--primary-strong); margin-bottom: 12px; font-weight: 800;
+    display: flex; align-items: center; gap: 8px; letter-spacing: 0.2px;
   }
+  .label::before { content: '♪'; color: var(--primary); font-size: 18px; filter: drop-shadow(0 1px 2px rgba(220,118,51,0.25)); }
 
-  .label::before {
-    content: '♪';
-    color: var(--secondary);
-    font-size: 18px;
-    filter: drop-shadow(0 1px 2px rgba(220, 118, 51, 0.3));
-  }
-
+  /* ===== BPM Section ===== */
   .bpm-section {
-    text-align: center;
-    padding: 24px 0;
-    background: var(--card-bg);
-    border-radius: 20px;
-    border: 1px solid var(--card-border);
-    margin: 20px 0;
+    text-align: center; padding: 20px 0; background: var(--card-bg);
+    border-radius: 18px; border: 1px solid var(--card-border); margin: 16px 0; box-shadow: var(--shadow-soft);
   }
-
-  .bpm-display {
-    font-size: 52px;
-    font-weight: 800;
-    color: var(--primary);
-    margin: 18px 0;
-    text-shadow: 0 2px 8px rgba(123, 67, 151, 0.2);
-    letter-spacing: -1px;
-  }
-
-  .bpm-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 24px;
-    margin-top: 24px;
-  }
+  .bpm-display { font-size: 50px; font-weight: 800; color: var(--primary-strong); margin: 14px 0; letter-spacing: -0.5px; text-shadow: 0 2px 6px rgba(201,95,29,0.14); }
+  .bpm-controls { display: flex; justify-content: center; align-items: center; gap: 22px; margin-top: 18px; }
 
   .bpm-btn {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    border: none;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: white;
-    font-size: 32px;
-    font-weight: bold;
-    box-shadow: var(--shadow-warm);
-    transition: all 0.25s ease;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 62px; height: 62px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff;
+    font-size: 30px; font-weight: 800; box-shadow: var(--shadow-warm);
+    transition: transform .2s ease, box-shadow .2s ease; display:flex; align-items:center; justify-content:center;
   }
-
-  .bpm-btn:active {
-    transform: scale(0.94);
-    box-shadow: var(--shadow-soft);
-  }
-
-  .bpm-btn:hover {
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
-  }
+  .bpm-btn:active { transform: scale(0.95); box-shadow: var(--shadow-soft); }
+  .bpm-btn:hover  { filter: brightness(1.03); }
 
   .bpm-input {
-    width: 130px;
-    height: 54px;
-    font-size: 26px;
-    font-weight: 700;
-    text-align: center;
-    border: 2px solid var(--panel-border);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--text-dark);
-    backdrop-filter: blur(8px);
-    box-shadow: inset 0 2px 4px rgba(123, 67, 151, 0.08);
+    width: 128px; height: 54px; font-size: 26px; font-weight: 800; text-align: center;
+    border: 2px solid var(--panel-border); border-radius: 16px;
+    background: rgba(255, 255, 255, 0.96); color: var(--text-dark); box-shadow: inset 0 2px 4px rgba(201,95,29,0.08);
   }
 
-  .controls-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 18px;
-    margin: 24px 0;
-  }
+  /* ===== Time Signature & Subdiv ===== */
+  .controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .control-card { background: var(--card-bg); border: 1.5px solid var(--card-border); border-radius: 16px; padding: 16px; backdrop-filter: blur(8px); box-shadow: var(--shadow-soft); position: relative; z-index: 1; }
+  .control-pair { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 
-  .control-card {
-    background: var(--card-bg);
-    border: 1.5px solid var(--card-border);
-    border-radius: 18px;
-    padding: 18px;
-    backdrop-filter: blur(8px);
-    box-shadow: var(--shadow-soft);
+  .control-input, .control-select{
+    width: 100%; height: 44px; font-size: 16px; font-weight: 700; text-align: center;
+    border: 1.5px solid var(--card-border); border-radius: 12px;
+    background: rgba(255,255,255,0.96); color: var(--text-dark); box-shadow: inset 0 1px 3px rgba(201,95,29,0.06);
   }
+  .control-select { padding: 0 10px; }
 
-  .control-pair {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 10px;
-  }
-
-  .control-input {
-    flex: 1;
-    height: 46px;
-    font-size: 17px;
-    font-weight: 600;
-    text-align: center;
-    border: 1.5px solid var(--card-border);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--text-dark);
-    box-shadow: inset 0 1px 3px rgba(123, 67, 151, 0.06);
-  }
-
-  .control-select {
-    width: 100%;
-    height: 46px;
-    font-size: 16px;
-    font-weight: 600;
-    text-align: center;
-    border: 1.5px solid var(--card-border);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.9);
-    color: var(--text-dark);
-    margin-top: 10px;
-    box-shadow: inset 0 1px 3px rgba(123, 67, 151, 0.06);
-  }
-
-  .volume-section {
-    padding: 20px;
-    background: var(--card-bg);
-    border-radius: 18px;
-    border: 1.5px solid var(--card-border);
-    box-shadow: var(--shadow-soft);
-  }
-
+  /* ===== Volume ===== */
+  .volume-section { padding: 16px; background: var(--card-bg); border-radius: 16px; border: 1.5px solid var(--card-border); box-shadow: var(--shadow-soft); }
   .volume-slider {
-    width: 100%;
-    height: 8px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, var(--warm-cream), var(--secondary), var(--primary));
-    appearance: none;
-    outline: none;
-    margin: 16px 0;
-    box-shadow: inset 0 1px 3px rgba(123, 67, 151, 0.1);
+    width: 100%; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #FFECD4, var(--primary), var(--primary-light));
+    appearance: none; outline: none; margin: 12px 0; box-shadow: inset 0 1px 3px rgba(201,95,29,0.12);
   }
-
   .volume-slider::-webkit-slider-thumb {
-    appearance: none;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    box-shadow: var(--shadow-warm);
-    cursor: pointer;
-    border: 2px solid white;
+    appearance: none; width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light)); box-shadow: var(--shadow-warm); cursor: pointer; border: 2px solid white;
   }
-
   .volume-slider::-moz-range-thumb {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    box-shadow: var(--shadow-warm);
-    cursor: pointer;
-    border: 2px solid white;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light)); box-shadow: var(--shadow-warm); cursor: pointer; border: 2px solid white;
   }
 
-  .kit-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 14px;
-    margin: 18px 0;
-  }
-
+  /* ===== Kit ===== */
+  .kit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 16px 0; }
   .kit-item {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 16px 18px;
-    background: var(--card-bg);
-    border: 1.5px solid var(--card-border);
-    border-radius: 16px;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    backdrop-filter: blur(8px);
-    box-shadow: var(--shadow-soft);
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    background: var(--card-bg); border: 1.5px solid var(--card-border); border-radius: 14px;
+    cursor: pointer; transition: all .2s ease; backdrop-filter: blur(8px); box-shadow: var(--shadow-soft);
   }
+  .kit-item:hover { background: rgba(255,246,234,0.98); border-color: var(--primary); transform: translateY(-1px); }
+  .kit-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--primary); border-radius: 4px; }
+  .kit-item label { font-size: 15px; font-weight: 700; color: var(--text-dark); cursor: pointer; flex: 1; }
 
-  .kit-item:hover {
-    background: rgba(253, 246, 227, 0.95);
-    border-color: var(--secondary);
-    transform: translateY(-1px);
-  }
-
-  .kit-item input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    accent-color: var(--primary);
-    border-radius: 4px;
-  }
-
-  .kit-item label {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-dark);
-    cursor: pointer;
-    flex: 1;
-    letter-spacing: 0.1px;
-  }
-
-  .play-controls {
-    display: flex;
-    gap: 18px;
-    justify-content: center;
-    margin-top: 36px;
-    padding: 12px 0;
-  }
-
+  /* ===== Play Buttons ===== */
+  .play-controls { display: flex; gap: 16px; justify-content: center; margin-top: 30px; padding: 10px 0; }
   .play-btn {
-    flex: 1;
-    max-width: 145px;
-    height: 60px;
-    border: none;
-    border-radius: 30px;
-    font-size: 19px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.25s ease;
-    box-shadow: var(--shadow-warm);
-    letter-spacing: 0.5px;
+    flex: 1; max-width: 150px; height: 56px; border: none; border-radius: 28px; font-size: 18px; font-weight: 800; cursor: pointer;
+    transition: all .2s ease; box-shadow: var(--shadow-warm); letter-spacing: 0.3px;
   }
+  .play-btn.start { background: linear-gradient(135deg, #27AE60, #2ECC71); color: #fff; }
+  .play-btn.stop  { background: linear-gradient(135deg, #E74C3C, #C0392B); color: #fff; }
+  .play-btn:active { transform: scale(0.97); }
+  .play-btn:hover  { box-shadow: var(--shadow-primary); transform: translateY(-1px); }
 
-  .play-btn.start {
-    background: linear-gradient(135deg, #27AE60, #2ECC71);
-    color: white;
-  }
-
-  .play-btn.stop {
-    background: linear-gradient(135deg, #E74C3C, #C0392B);
-    color: white;
-  }
-
-  .play-btn:active {
-    transform: scale(0.97);
-  }
-
-  .play-btn:hover {
-    box-shadow: var(--shadow-primary);
-    transform: translateY(-1px);
-  }
-
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(123, 67, 151, 0.2), transparent);
-    margin: 28px 0;
-  }
+  .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(220,118,51,0.28), transparent); margin: 24px 0; }
 
   /* Unlock overlay */
   #unlockOverlay {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(253, 246, 227, 0.96);
-    backdrop-filter: blur(12px);
-    z-index: 9999;
-    padding: 20px;
-    transition: opacity 0.4s ease;
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 246, 234, 0.96); backdrop-filter: blur(12px); z-index: 9999; padding: 20px; transition: opacity 0.4s ease;
   }
-
-  #unlockOverlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-  }
-
+  #unlockOverlay.hidden { opacity: 0; pointer-events: none; }
   .unlock-card {
-    background: var(--panel-bg);
-    backdrop-filter: blur(12px);
-    border: 1.5px solid var(--panel-border);
-    border-radius: 28px;
-    padding: 36px 28px;
-    text-align: center;
-    max-width: 340px;
-    box-shadow: var(--shadow-primary);
+    background: var(--panel-bg); border: 1.5px solid var(--panel-border); border-radius: 24px;
+    padding: 30px 24px; text-align: center; max-width: 340px; box-shadow: var(--shadow-primary);
   }
-
-  .unlock-title {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-accent);
-    margin-bottom: 14px;
-  }
-
-  .unlock-message {
-    font-size: 17px;
-    color: var(--text-medium);
-    margin-bottom: 28px;
-    line-height: 1.6;
-  }
-
+  .unlock-title   { font-size: 20px; font-weight: 800; color: var(--primary-strong); margin-bottom: 12px; }
+  .unlock-message { font-size: 16px; color: var(--text-medium); margin-bottom: 22px; line-height: 1.6; }
   #unlock {
-    width: 100%;
-    height: 60px;
-    border: none;
-    border-radius: 30px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: white;
-    font-size: 19px;
-    font-weight: 700;
-    cursor: pointer;
-    box-shadow: var(--shadow-warm);
-    transition: all 0.25s ease;
-    letter-spacing: 0.5px;
+    width: 100%; height: 56px; border: none; border-radius: 28px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: #fff;
+    font-size: 18px; font-weight: 800; cursor: pointer; box-shadow: var(--shadow-warm); transition: all .2s ease;
   }
+  #unlock:active { transform: scale(0.97); }
+  #unlock:hover  { filter: brightness(1.03); }
 
-  #unlock:active {
-    transform: scale(0.97);
-  }
-
-  #unlock:hover {
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
-  }
-
-  /* Responsive adjustments */
   @media (max-width: 375px) {
     .app { padding-left: 16px; padding-right: 16px; }
     .bpm-display { font-size: 46px; }
-    .controls-row { gap: 14px; }
+    .controls-row { gap: 12px; }
     .kit-grid { grid-template-columns: 1fr; }
-    .bpm-controls { gap: 20px; }
-    .bpm-btn { width: 58px; height: 58px; font-size: 28px; }
+    .bpm-controls { gap: 18px; }
+    .bpm-btn { width: 56px; height: 56px; font-size: 26px; }
   }
 
-  /* 美しいフォーカス状態 */
-  input:focus, select:focus, button:focus {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-  }
+  input:focus, select:focus, button:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
 </style>
 </head>
 <body>
   <div class="decorative-pattern"></div>
-  
+
   <!-- Unlock overlay -->
   <div id="unlockOverlay">
     <div class="unlock-card">
@@ -502,14 +215,15 @@
 
     <div class="panel">
       <!-- BPM Section -->
-      <div class="section bmp-section">
+      <div class="section bpm-section">
         <div class="label">テンポ設定</div>
         <div class="bpm-section">
           <div class="bpm-display" id="bpmDisplay">100</div>
           <div class="bpm-controls">
-            <button id="bpmMinus" class="bmp-btn">−</button>
+            <!-- ▼ 崩れ修正：クラス名を bpm-btn に統一 -->
+            <button id="bpmMinus" class="bpm-btn" aria-label="BPMを下げる">−</button>
             <input id="bpm" class="bpm-input" type="number" value="100" min="20" max="300" />
-            <button id="bpmPlus" class="bpm-btn">＋</button>
+            <button id="bpmPlus" class="bpm-btn" aria-label="BPMを上げる">＋</button>
           </div>
         </div>
       </div>
@@ -521,16 +235,17 @@
         <div class="label">拍子とリズム</div>
         <div class="controls-row">
           <div class="control-card">
-            <div class="label" style="margin-bottom: 8px; font-size: 13px;">拍子記号</div>
+            <div class="label" style="margin-bottom: 8px; font-size: 12px;">拍子記号</div>
             <div class="control-pair">
-              <input id="beats" class="control-input" type="number" value="4" min="1" max="12">
+              <input id="beats" class="control-input" type="number" value="4" min="1" max="12" aria-label="分子">
               <span style="color: var(--text-light); font-size: 22px; font-weight: bold;">/</span>
-              <input id="beatUnit" class="control-input" type="number" value="4" min="1" max="32">
+              <input id="beatUnit" class="control-input" type="number" value="4" min="1" max="32" aria-label="分母">
             </div>
           </div>
-          <div class="control-card">
-            <div class="label" style="margin-bottom: 8px; font-size: 13px;">音符の種類</div>
-            <select id="subdiv" class="control-select">
+          <div class="control-card" style="z-index:2">
+            <div class="label" style="margin-bottom: 8px; font-size: 12px;">音符の種類</div>
+            <!-- ▼ ドロップダウンが切れないよう panel の overflow を visible 済 -->
+            <select id="subdiv" class="control-select" aria-label="細分">
               <option value="quarter">4分音符</option>
               <option value="eighth" selected>8分音符</option>
               <option value="triplet">3連符</option>
@@ -554,30 +269,12 @@
       <div class="section">
         <div class="label">楽器の選択</div>
         <div class="kit-grid">
-          <div class="kit-item">
-            <input type="checkbox" id="kick" checked>
-            <label for="kick">キック</label>
-          </div>
-          <div class="kit-item">
-            <input type="checkbox" id="snare" checked>
-            <label for="snare">スネア</label>
-          </div>
-          <div class="kit-item">
-            <input type="checkbox" id="hihat" checked>
-            <label for="hihat">ハイハット</label>
-          </div>
-          <div class="kit-item">
-            <input type="checkbox" id="tamb">
-            <label for="tamb">タンバリン</label>
-          </div>
-          <div class="kit-item">
-            <input type="checkbox" id="shaker">
-            <label for="shaker">シェイカー</label>
-          </div>
-          <div class="kit-item">
-            <input type="checkbox" id="conga">
-            <label for="conga">コンガ</label>
-          </div>
+          <div class="kit-item"><input type="checkbox" id="kick" checked><label for="kick">キック</label></div>
+          <div class="kit-item"><input type="checkbox" id="snare" checked><label for="snare">スネア</label></div>
+          <div class="kit-item"><input type="checkbox" id="hihat" checked><label for="hihat">ハイハット</label></div>
+          <div class="kit-item"><input type="checkbox" id="tamb"><label for="tamb">タンバリン</label></div>
+          <div class="kit-item"><input type="checkbox" id="shaker"><label for="shaker">シェイカー</label></div>
+          <div class="kit-item"><input type="checkbox" id="conga"><label for="conga">コンガ</label></div>
         </div>
       </div>
 
@@ -605,16 +302,8 @@
   function unlockAudioNow(){
     initAudio();
     try{ ctx.resume(); }catch(e){}
-    try{ 
-      const s=ctx.createBufferSource(); 
-      s.buffer=ctx.createBuffer(1,1,ctx.sampleRate); 
-      s.connect(master); 
-      s.start(0);
-    }catch(e){}
-    const ov = el('unlockOverlay'); 
-    if (ctx && ctx.state==='running' && ov) {
-      ov.classList.add('hidden');
-    }
+    try{ const s=ctx.createBufferSource(); s.buffer=ctx.createBuffer(1,1,ctx.sampleRate); s.connect(master); s.start(0);}catch(e){}
+    const ov = el('unlockOverlay'); if (ctx && ctx.state==='running' && ov) ov.classList.add('hidden');
   }
 
   function playKick(t, vol=1){
@@ -652,35 +341,22 @@
   }
 
   function playTamb(t, vol=1){
-    // Tambourine（少しだけ存在感アップ）
     const n=ctx.createBufferSource(); 
     const b=ctx.createBuffer(1, ctx.sampleRate*0.15, ctx.sampleRate);
     const d=b.getChannelData(0); 
-    for(let i=0;i<d.length;i++) {
-      d[i]=(Math.random()*2-1) * Math.sin(i*0.02) * 0.3;
-    }
-    n.buffer=b; 
-    const hp=ctx.createBiquadFilter(); 
-    hp.type='highpass'; 
-    hp.frequency.value=3000;
-    const g=ctx.createGain(); 
-    g.gain.setValueAtTime(0.55*vol,t);   // ← 0.40 → 0.55 にアップ
-    g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
-    n.connect(hp).connect(g).connect(master); 
-    n.start(t); 
-    n.stop(t+0.15);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1) * Math.sin(i*0.02) * 0.3;
+    n.buffer=b;
+    const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3000;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.55*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
+    n.connect(hp).connect(g).connect(master); n.start(t); n.stop(t+0.15);
   }
 
-  // ★ 追加：シェイカー
   function playShaker(t, vol=1){
     const n=ctx.createBufferSource();
     const len=(ctx.sampleRate*0.06)|0;
     const b=ctx.createBuffer(1,len,ctx.sampleRate);
     const d=b.getChannelData(0);
-    for(let i=0;i<d.length;i++){
-      // 白色ノイズを短く包絡
-      d[i]=(Math.random()*2-1) * Math.exp(-i/(len*0.55));
-    }
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1) * Math.exp(-i/(len*0.55));
     n.buffer=b;
     const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2800; bp.Q.value=1.2;
     const g=ctx.createGain(); g.gain.setValueAtTime(0.45*vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.07);
@@ -688,7 +364,6 @@
     n.start(t); n.stop(t+0.08);
   }
 
-  // ★ 追加：コンガ
   function playConga(t, vol=1){
     const o=ctx.createOscillator(), g=ctx.createGain();
     o.type='sine';
@@ -700,6 +375,7 @@
     o.start(t); o.stop(t+0.2);
   }
 
+  // Transport & pattern (8ビート：HH=8分, Sn=2&4, Kick=1&3)
   let bpmVal=100, beats=4, beatUnit=4, subdiv='eighth';
   let playing=false, step=0, nextTime=0;
   const ahead=0.14;
@@ -716,33 +392,22 @@
     const stepInBeat = i % stepsPerBeat;
     const beatInBar  = beatIndex % beats;
 
-    // ハイハット（8分）：ダウン0.75 / 裏0.50
+    // Hi-Hat：ダウン0.75 / 裏0.50
     if (el('hihat').checked){
       const hhLevel = (stepInBeat===0) ? 0.75 : 0.50;
       playHihat(t, hhLevel);
     }
 
     if (stepInBeat===0){
-      // Snare：2拍/4拍
       if (el('snare').checked && (beatInBar===1 || beatInBar===3)){
         playSnare(t, beatInBar===1 ? 0.95 : 0.90);
       }
-      // Kick：1拍/3拍
       if (el('kick').checked && (beatInBar===0 || beatInBar===2)){
         playKick(t, beatInBar===0 ? 1.00 : 0.90);
       }
-      // Tambourine：バー頭で少しだけ強めに
-      if (el('tamb').checked && beatInBar === 0) {
-        playTamb(t, 0.75); // ← 0.60 → 0.75
-      }
-      // ★ Shaker：各拍の頭で軽く
-      if (el('shaker').checked){
-        playShaker(t, 0.50);
-      }
-      // ★ Conga：1拍/3拍（ベースを邪魔しない程度に）
-      if (el('conga').checked && (beatInBar===0 || beatInBar===2)){
-        playConga(t, 0.60);
-      }
+      if (el('tamb').checked && beatInBar===0) { playTamb(t, 0.75); }
+      if (el('shaker').checked) { playShaker(t, 0.50); }
+      if (el('conga').checked && (beatInBar===0 || beatInBar===2)) { playConga(t, 0.60); }
     }
   }
 
@@ -755,9 +420,7 @@
     if (playing) requestAnimationFrame(scheduler);
   }
 
-  function updateBpmDisplay() {
-    el('bpmDisplay').textContent = el('bpm').value;
-  }
+  function updateBpmDisplay(){ el('bpmDisplay').textContent = el('bpm').value; }
 
   function start(){
     if (!ctx || ctx.state!=='running') unlockAudioNow();
@@ -768,44 +431,23 @@
     playing=true; step=0; nextTime=ctx.currentTime+0.05;
     scheduler();
   }
+  function stop(){ playing=false; }
 
-  function stop(){ 
-    playing=false; 
-  }
-
-  // Event listeners
   const unlockBtn = el('unlock');
   if (unlockBtn){
     unlockBtn.addEventListener('click', unlockAudioNow, {passive:false});
     unlockBtn.addEventListener('touchend', unlockAudioNow, {passive:false});
   }
-
-  document.addEventListener('pointerdown', ()=>{
-    if(!ctx || ctx.state!=='running') unlockAudioNow();
-  }, {passive:false});
+  document.addEventListener('pointerdown', ()=>{ if(!ctx || ctx.state!=='running') unlockAudioNow(); }, {passive:false});
 
   el('start').addEventListener('click', start, {passive:false});
   el('stop').addEventListener('click', stop, {passive:false});
 
-  el('bpmMinus').addEventListener('click', ()=>{ 
-    const newVal = Math.max(20, parseInt(el('bpm').value||'100',10)-1);
-    el('bpm').value = newVal;
-    updateBpmDisplay();
-  }, {passive:false});
-  
-  el('bpmPlus').addEventListener('click', ()=>{ 
-    const newVal = Math.min(300, parseInt(el('bpm').value||'100',10)+1);
-    el('bpm').value = newVal;
-    updateBpmDisplay();
-  }, {passive:false});
-
+  el('bpmMinus').addEventListener('click', ()=>{ el('bpm').value = Math.max(20, parseInt(el('bpm').value||'100',10)-1); updateBpmDisplay(); }, {passive:false});
+  el('bpmPlus').addEventListener('click', ()=>{ el('bpm').value = Math.min(300, parseInt(el('bpm').value||'100',10)+1); updateBpmDisplay(); }, {passive:false});
   el('bpm').addEventListener('input', updateBpmDisplay);
 
-  el('volume').addEventListener('input', (e)=>{
-    if(master) master.gain.value=parseFloat(e.target.value||'0.7');
-  });
-
-  // Initialize display
+  el('volume').addEventListener('input', (e)=>{ if(master) master.gain.value=parseFloat(e.target.value||'0.7'); });
   updateBpmDisplay();
 })();
 </script>
