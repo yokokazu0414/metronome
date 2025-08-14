@@ -652,7 +652,7 @@
   }
 
   function playTamb(t, vol=1){
-    // Tambourine sound synthesis
+    // Tambourine（少しだけ存在感アップ）
     const n=ctx.createBufferSource(); 
     const b=ctx.createBuffer(1, ctx.sampleRate*0.15, ctx.sampleRate);
     const d=b.getChannelData(0); 
@@ -664,11 +664,40 @@
     hp.type='highpass'; 
     hp.frequency.value=3000;
     const g=ctx.createGain(); 
-    g.gain.setValueAtTime(0.4*vol,t); 
+    g.gain.setValueAtTime(0.55*vol,t);   // ← 0.40 → 0.55 にアップ
     g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
     n.connect(hp).connect(g).connect(master); 
     n.start(t); 
     n.stop(t+0.15);
+  }
+
+  // ★ 追加：シェイカー
+  function playShaker(t, vol=1){
+    const n=ctx.createBufferSource();
+    const len=(ctx.sampleRate*0.06)|0;
+    const b=ctx.createBuffer(1,len,ctx.sampleRate);
+    const d=b.getChannelData(0);
+    for(let i=0;i<d.length;i++){
+      // 白色ノイズを短く包絡
+      d[i]=(Math.random()*2-1) * Math.exp(-i/(len*0.55));
+    }
+    n.buffer=b;
+    const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2800; bp.Q.value=1.2;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.45*vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    n.connect(bp).connect(g).connect(master);
+    n.start(t); n.stop(t+0.08);
+  }
+
+  // ★ 追加：コンガ
+  function playConga(t, vol=1){
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(420,t);
+    o.frequency.exponentialRampToValueAtTime(300,t+0.06);
+    g.gain.setValueAtTime(0.55*vol,t);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t+0.2);
   }
 
   let bpmVal=100, beats=4, beatUnit=4, subdiv='eighth';
@@ -687,21 +716,32 @@
     const stepInBeat = i % stepsPerBeat;
     const beatInBar  = beatIndex % beats;
 
-    // ハイハット
+    // ハイハット（8分）：ダウン0.75 / 裏0.50
     if (el('hihat').checked){
       const hhLevel = (stepInBeat===0) ? 0.75 : 0.50;
       playHihat(t, hhLevel);
     }
 
     if (stepInBeat===0){
+      // Snare：2拍/4拍
       if (el('snare').checked && (beatInBar===1 || beatInBar===3)){
         playSnare(t, beatInBar===1 ? 0.95 : 0.90);
       }
+      // Kick：1拍/3拍
       if (el('kick').checked && (beatInBar===0 || beatInBar===2)){
         playKick(t, beatInBar===0 ? 1.00 : 0.90);
       }
+      // Tambourine：バー頭で少しだけ強めに
       if (el('tamb').checked && beatInBar === 0) {
-        playTamb(t, 0.6);
+        playTamb(t, 0.75); // ← 0.60 → 0.75
+      }
+      // ★ Shaker：各拍の頭で軽く
+      if (el('shaker').checked){
+        playShaker(t, 0.50);
+      }
+      // ★ Conga：1拍/3拍（ベースを邪魔しない程度に）
+      if (el('conga').checked && (beatInBar===0 || beatInBar===2)){
+        playConga(t, 0.60);
       }
     }
   }
@@ -736,28 +776,28 @@
   // Event listeners
   const unlockBtn = el('unlock');
   if (unlockBtn){
-    unlockBtn.addEventListener('click', unlockAudioNow);
-    unlockBtn.addEventListener('touchend', unlockAudioNow);
+    unlockBtn.addEventListener('click', unlockAudioNow, {passive:false});
+    unlockBtn.addEventListener('touchend', unlockAudioNow, {passive:false});
   }
 
   document.addEventListener('pointerdown', ()=>{
     if(!ctx || ctx.state!=='running') unlockAudioNow();
-  });
+  }, {passive:false});
 
-  el('start').addEventListener('click', start);
-  el('stop').addEventListener('click', stop);
+  el('start').addEventListener('click', start, {passive:false});
+  el('stop').addEventListener('click', stop, {passive:false});
 
   el('bpmMinus').addEventListener('click', ()=>{ 
     const newVal = Math.max(20, parseInt(el('bpm').value||'100',10)-1);
     el('bpm').value = newVal;
     updateBpmDisplay();
-  });
+  }, {passive:false});
   
   el('bpmPlus').addEventListener('click', ()=>{ 
     const newVal = Math.min(300, parseInt(el('bpm').value||'100',10)+1);
     el('bpm').value = newVal;
     updateBpmDisplay();
-  });
+  }, {passive:false});
 
   el('bpm').addEventListener('input', updateBpmDisplay);
 
