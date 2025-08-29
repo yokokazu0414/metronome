@@ -71,8 +71,7 @@
     margin: 0 auto 22px;
     box-shadow: var(--shadow-primary);
     position: relative;
-    /* ▼ ドロップダウンが切れないように（重要修正） */
-    overflow: visible;
+    overflow: visible; /* ドロップダウンが切れないように */
   }
   .panel::before {
     content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
@@ -114,14 +113,13 @@
   /* ===== Time Signature & Subdiv ===== */
   .controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
   .control-card { background: var(--card-bg); border: 1.5px solid var(--card-border); border-radius: 16px; padding: 16px; backdrop-filter: blur(8px); box-shadow: var(--shadow-soft); position: relative; z-index: 1; }
-  .control-pair { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 
-  .control-input, .control-select{
+  .control-select{
     width: 100%; height: 44px; font-size: 16px; font-weight: 700; text-align: center;
     border: 1.5px solid var(--card-border); border-radius: 12px;
     background: rgba(255,255,255,0.96); color: var(--text-dark); box-shadow: inset 0 1px 3px rgba(201,95,29,0.06);
+    padding: 0 10px;
   }
-  .control-select { padding: 0 10px; }
 
   /* ===== Volume ===== */
   .volume-section { padding: 16px; background: var(--card-bg); border-radius: 16px; border: 1.5px solid var(--card-border); box-shadow: var(--shadow-soft); }
@@ -161,6 +159,28 @@
   .play-btn:hover  { box-shadow: var(--shadow-primary); transform: translateY(-1px); }
 
   .divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(220,118,51,0.28), transparent); margin: 24px 0; }
+
+  /* ===== 拍頭インジケーター ===== */
+  .indicator {
+    display:flex; justify-content:center; gap:10px; margin-top:10px;
+  }
+  .dot {
+    width:14px; height:14px; border-radius:50%;
+    background: rgba(0,0,0,0.1);
+    border: 2px solid rgba(220,118,51,0.35);
+    box-shadow: 0 2px 5px rgba(201,95,29,0.12) inset;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease;
+  }
+  .dot.strong { width:16px; height:16px; }
+  .dot.double::after { /* 7/8の5拍目：弱強の目印(二重リング) */
+    content:''; display:block; width:6px; height:6px; border-radius:50%;
+    border:2px solid rgba(220,118,51,0.6); margin:2px auto 0;
+  }
+  .dot.active {
+    background: var(--primary);
+    border-color: var(--primary-strong);
+    transform: scale(1.15);
+  }
 
   /* Unlock overlay */
   #unlockOverlay {
@@ -208,7 +228,7 @@
 
   <div class="app">
     <div class="header">
-      <h1 class="title" onclick="void 0">エミリアピアノ教室</h1>
+      <h1 class="title">エミリアピアノ教室</h1>
       <div class="subtitle">メトロノーム</div>
       <div class="author">Created by 新田ナオミ</div>
     </div>
@@ -233,14 +253,22 @@
       <div class="section">
         <div class="label">拍子とリズム</div>
         <div class="controls-row">
-          <div class="control-card">
+          <!-- 拍子記号はセレクト -->
+          <div class="control-card" style="z-index:2">
             <div class="label" style="margin-bottom: 8px; font-size: 12px;">拍子記号</div>
-            <div class="control-pair">
-              <input id="beats" class="control-input" type="number" value="4" min="1" max="12" aria-label="分子">
-              <span style="color: var(--text-light); font-size: 22px; font-weight: bold;">/</span>
-              <input id="beatUnit" class="control-input" type="number" value="4" min="1" max="32" aria-label="分母">
-            </div>
+            <select id="timeSig" class="control-select" aria-label="拍子記号">
+              <option value="2/2">2/2</option>
+              <option value="2/4">2/4</option>
+              <option value="3/4">3/4</option>
+              <option value="4/4" selected>4/4</option>
+              <option value="3/8">3/8</option>
+              <option value="6/8">6/8</option>
+              <option value="7/8">7/8</option>
+            </select>
+            <!-- 拍頭インジケーター -->
+            <div id="beatIndicator" class="indicator" aria-hidden="true"></div>
           </div>
+
           <div class="control-card" style="z-index:2">
             <div class="label" style="margin-bottom: 8px; font-size: 12px;">音符の種類</div>
             <select id="subdiv" class="control-select" aria-label="細分">
@@ -287,15 +315,13 @@
 (() => {
   const el = (id) => document.getElementById(id);
 
-  // === 集中設定（UIから独立） ====================================
+  // === 集中設定 ===================================================
   const CONFIG = {
     defaultBpm: 100,
-    defaultBeats: 4,
-    defaultBeatUnit: 4,
+    defaultTimeSig: '4/4',
     defaultSubdiv: 'eighth',
     scheduleAheadSec: 0.14
   };
-
   // 各楽器の標準レベル（相対値）
   const LEVELS = {
     hihatDown: 0.75,
@@ -318,7 +344,6 @@
     master.connect(ctx.destination);
     return ctx;
   }
-
   function unlockAudioNow(){
     initAudio();
     try{ ctx.resume(); }catch(e){}
@@ -336,7 +361,6 @@
     g.gain.exponentialRampToValueAtTime(0.001,t+0.28);
     o.connect(g).connect(master); o.start(t); o.stop(t+0.32);
   }
-
   function playSnare(t, vol=1){
     const tone=ctx.createOscillator(), tg=ctx.createGain();
     tone.type='triangle';
@@ -352,7 +376,6 @@
     tone.start(t); tone.stop(t+0.18);
     n.start(t); n.stop(t+0.2);
   }
-
   function playHihat(t, vol=1){
     const n=ctx.createBufferSource(); const b=ctx.createBuffer(1, ctx.sampleRate*0.04, ctx.sampleRate);
     const d=b.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
@@ -360,7 +383,6 @@
     const g=ctx.createGain(); g.gain.setValueAtTime(0.6*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.05);
     n.connect(hp).connect(g).connect(master); n.start(t); n.stop(t+0.05);
   }
-
   function playTamb(t, vol=1){
     const n=ctx.createBufferSource(); 
     const b=ctx.createBuffer(1, ctx.sampleRate*0.15, ctx.sampleRate);
@@ -371,7 +393,6 @@
     const g=ctx.createGain(); g.gain.setValueAtTime(0.55*vol,t); g.gain.exponentialRampToValueAtTime(0.01,t+0.15);
     n.connect(hp).connect(g).connect(master); n.start(t); n.stop(t+0.15);
   }
-
   function playShaker(t, vol=1){
     const n=ctx.createBufferSource();
     const len=(ctx.sampleRate*0.06)|0;
@@ -384,7 +405,6 @@
     n.connect(bp).connect(g).connect(master);
     n.start(t); n.stop(t+0.08);
   }
-
   function playConga(t, vol=1){
     const o=ctx.createOscillator(), g=ctx.createGain();
     o.type='sine';
@@ -396,11 +416,19 @@
     o.start(t); o.stop(t+0.2);
   }
 
-  // ==== トランスポート ==========================================
-  let bpmVal=CONFIG.defaultBpm, beats=CONFIG.defaultBeats, beatUnit=CONFIG.defaultBeatUnit, subdiv=CONFIG.defaultSubdiv;
+  // ==== トランスポート／状態 =====================================
+  let bpmVal = CONFIG.defaultBpm;
+  let beats = 4, beatUnit = 4;       // timeSigから決定
+  let subdiv = CONFIG.defaultSubdiv;
+  let currentTimeSig = CONFIG.defaultTimeSig;
   let playing=false, step=0, nextTime=0;
   const ahead = CONFIG.scheduleAheadSec;
 
+  function parseTimeSig(str){
+    const m = String(str||CONFIG.defaultTimeSig).match(/^(\d+)\s*\/\s*(\d+)$/);
+    if(!m) return [4,4];
+    return [parseInt(m[1],10), parseInt(m[2],10)];
+  }
   function secPerStep(){
     const spb = 60 / bpmVal;
     const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
@@ -411,40 +439,90 @@
     return spb * (4/beatUnit);
   }
 
-  // ==== スケジューラ（キック：1拍=単発 / 3拍=ダブル） ============
+  // ==== インジケーター ===========================================
+  function buildIndicator(){
+    const cont = el('beatIndicator');
+    cont.innerHTML = '';
+    for(let i=0;i<beats;i++){
+      const d = document.createElement('span');
+      d.className = 'dot';
+      // 1拍目は強
+      if(i===0) d.classList.add('strong');
+      // 7/8 の 5拍目（index 4）は “弱強” 表現のドット（ダブルマーク）
+      if(currentTimeSig==='7/8' && i===4) d.classList.add('double');
+      cont.appendChild(d);
+    }
+  }
+  let lastActiveDot = -1;
+  function updateIndicator(beatInBar){
+    const cont = el('beatIndicator');
+    const dots = cont.children;
+    if(!dots || !dots.length) return;
+    if(lastActiveDot>=0 && lastActiveDot<dots.length) dots[lastActiveDot].classList.remove('active');
+    if(beatInBar>=0 && beatInBar<dots.length) dots[beatInBar].classList.add('active');
+    lastActiveDot = beatInBar;
+  }
+
+  // ==== スケジューラ（キック：4/4→1拍単発 / 3拍ダブル） =========
   function scheduleStep(i, t){
     const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
     const beatIndex = Math.floor(i/stepsPerBeat);
     const stepInBeat = i % stepsPerBeat;
     const beatInBar  = beatIndex % beats;
 
-    // Hi-Hat：8分（ダウン/裏）
+    // Hi-Hat：通常は8分（ダウン/裏）
     if (el('hihat').checked){
-      const hhLevel = (stepInBeat===0) ? LEVELS.hihatDown : LEVELS.hihatUp;
-      playHihat(t, hhLevel);
+      // ▼ 7/8の5拍目は「弱→強」を短間隔で（デフォのダウンを置き換える）
+      if(currentTimeSig==='7/8' && stepInBeat===0 && beatInBar===4){
+        const weak = Math.max(0.4, LEVELS.hihatUp);     // 少し弱め
+        const strong = Math.min(1.0, LEVELS.hihatDown*1.2); // その後 強め
+        playHihat(t, weak);
+        playHihat(t + secPerBeat()*0.18, strong); // ちょい後に強
+      }else{
+        const base = (stepInBeat===0) ? LEVELS.hihatDown : LEVELS.hihatUp;
+        // 1拍目はやや強調
+        const accent = (stepInBeat===0 && beatInBar===0) ? 1.15 : 1.0;
+        playHihat(t, Math.min(1, base*accent));
+      }
     }
 
+    // 拍頭インジケーター更新
+    if(stepInBeat===0){ updateIndicator(beatInBar); }
+
     if (stepInBeat===0){
-      // Snare：2拍/4拍
-      if (el('snare').checked && (beatInBar===1 || beatInBar===3)){
+      // Snare：2拍/4拍（4/4前提の基本スコア。変拍子は必要なら都度拡張）
+      if (el('snare').checked && (beatInBar===1 || beatInBar===3) && beatUnit===4 && beats===4){
         playSnare(t, beatInBar===1 ? LEVELS.snareBeat2 : LEVELS.snareBeat4);
       }
-      // Kick：1拍=単発（強） / 3拍=ダブル（頭+半拍後）
+
+      // Kick：4/4のとき 1拍=単発（強） / 3拍=ダブル
       if (el('kick').checked){
-        if (beatInBar === 0){
-          playKick(t, LEVELS.kickStrong);
-        } else if (beatInBar === 2){
-          const second = t + secPerBeat() * 0.50; // 半拍後（8分）
-          playKick(t, LEVELS.kickWeak + 0.05);    // 1発目 少しだけ強め
-          playKick(second, 0.75);                 // 2発目 やや弱め
+        if (beatUnit===4 && beats===4){
+          if (beatInBar === 0){
+            playKick(t, LEVELS.kickStrong);
+          } else if (beatInBar === 2){
+            const second = t + secPerBeat() * 0.50; // 半拍後（8分）
+            playKick(t, LEVELS.kickWeak + 0.05);
+            playKick(second, 0.75);
+          }
+        } else {
+          // 変拍子時は拍頭で軽く支える（必要に応じて拡張可）
+          playKick(t, 0.70);
         }
       }
+
       // Tamb：バー頭
       if (el('tamb').checked && beatInBar===0){ playTamb(t, LEVELS.tambBarHead); }
       // Shaker：各拍頭で軽く
       if (el('shaker').checked){ playShaker(t, LEVELS.shakerBeatHead); }
-      // Conga：1拍/3拍
-      if (el('conga').checked && (beatInBar===0 || beatInBar===2)){ playConga(t, LEVELS.congaOn13); }
+      // Conga：1拍/3拍（4/4の典型）。他拍子は拍頭のみ
+      if (el('conga').checked){
+        if(beats===4 && beatUnit===4){
+          if(beatInBar===0 || beatInBar===2){ playConga(t, LEVELS.congaOn13); }
+        }else{
+          if(stepInBeat===0){ playConga(t, 0.55); }
+        }
+      }
     }
   }
 
@@ -461,29 +539,23 @@
 
   function start(){
     if (!ctx || ctx.state!=='running') unlockAudioNow();
-    bpmVal   = parseInt(el('bpm').value||String(CONFIG.defaultBpm),10);
-    beats    = parseInt(el('beats').value||String(CONFIG.defaultBeats),10);
-    beatUnit = parseInt(el('beatUnit').value||String(CONFIG.defaultBeatUnit),10);
-    subdiv   = (el('subdiv').value||CONFIG.defaultSubdiv);
+    bpmVal = parseInt(el('bpm').value||String(CONFIG.defaultBpm),10);
+    currentTimeSig = el('timeSig').value || CONFIG.defaultTimeSig;
+    [beats, beatUnit] = currentTimeSig.split('/').map(n=>parseInt(n,10));
+    subdiv = (el('subdiv').value||CONFIG.defaultSubdiv);
+    buildIndicator(); // 拍数が変わるので再構築
     playing=true; step=0; nextTime=ctx.currentTime+0.05;
     scheduler();
   }
   function stop(){ playing=false; }
 
-  // === 開発ヘルパー ===============================================
-  function setBpm(v){ el('bpm').value = Math.max(20, Math.min(300, v|0)); updateBpmDisplay(); }
-  function setTimeSignature(beats_, unit){ el('beats').value = beats_|0; el('beatUnit').value = unit|0; }
-  function setSubdiv(name){ el('subdiv').value = name; }
+  // === ヘルパー＆永続化 ==========================================
   function setVolume01(v){ const x = Math.max(0, Math.min(1, +v)); el('volume').value = x; if(master) master.gain.value = x; }
-  function setKitEnabled(id, on){ const c = el(id); if(c){ c.checked = !!on; } }
-  function setLevel(key, value){ if(key in LEVELS){ LEVELS[key] = +value; } }
 
-  // === 永続化（任意） =============================================
   function persist(){
     localStorage.setItem('metroSettings', JSON.stringify({
       bpm: el('bpm').value,
-      beats: el('beats').value,
-      beatUnit: el('beatUnit').value,
+      timeSig: el('timeSig').value,
       subdiv: el('subdiv').value,
       volume: el('volume').value,
       kits: {
@@ -496,12 +568,20 @@
     try{
       const s = JSON.parse(localStorage.getItem('metroSettings')||'{}');
       if(s.bpm) el('bpm').value = s.bpm;
-      if(s.beats) el('beats').value = s.beats;
-      if(s.beatUnit) el('beatUnit').value = s.beatUnit;
+      const tsSel = el('timeSig');
+      if(s.timeSig && [...tsSel.options].some(o=>o.value===s.timeSig)){
+        tsSel.value = s.timeSig;
+      } else {
+        tsSel.value = CONFIG.defaultTimeSig;
+      }
       if(s.subdiv) el('subdiv').value = s.subdiv;
       if(s.volume){ el('volume').value = s.volume; if(master) master.gain.value = +s.volume; }
-      if(s.kits){ for(const k in s.kits){ setKitEnabled(k, s.kits[k]); } }
+      if(s.kits){ for(const k in s.kits){ const c = el(k); if(c) c.checked = !!s.kits[k]; } }
       updateBpmDisplay();
+      // 初期のインジケーター
+      [beats, beatUnit] = tsSel.value.split('/').map(n=>parseInt(n,10));
+      buildIndicator();
+      updateIndicator(-1);
     }catch(e){}
   }
 
@@ -520,12 +600,17 @@
   el('bpmPlus').addEventListener('click',  ()=>{ el('bpm').value = Math.min(300, parseInt(el('bpm').value||'100',10)+1); updateBpmDisplay(); persist(); }, {passive:false});
   el('bpm').addEventListener('input', ()=>{ updateBpmDisplay(); persist(); });
 
-  el('volume').addEventListener('input', (e)=>{ if(master) master.gain.value=parseFloat(e.target.value||'0.7'); persist(); });
-
-  ['beats','beatUnit','subdiv','kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
+  ['timeSig','subdiv','volume','kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
     const node = el(id); if(!node) return;
-    const ev = (node.type==='checkbox') ? 'change' : 'input';
-    node.addEventListener(ev, persist, {passive:true});
+    const ev = (node.type==='checkbox') ? 'change' : (node.type==='range' ? 'input' : 'change');
+    node.addEventListener(ev, ()=>{ 
+      if(id==='timeSig'){ 
+        const [b,u] = node.value.split('/').map(n=>parseInt(n,10));
+        beats=b; beatUnit=u; currentTimeSig=node.value; buildIndicator(); updateIndicator(-1);
+      }
+      if(id==='volume'){ if(master) master.gain.value = parseFloat(node.value||'0.7'); }
+      persist();
+    }, {passive:true});
   });
 
   // 初期表示
