@@ -110,8 +110,8 @@
     background: rgba(255, 255, 255, 0.96); color: var(--text-dark); box-shadow: inset 0 2px 4px rgba(201,95,29,0.08);
   }
 
-  /* ===== Time Signature & Subdiv ===== */
-  .controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  /* ===== Time Signature ===== */
+  .controls-row { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 20px 0; }
   .control-card { background: var(--card-bg); border: 1.5px solid var(--card-border); border-radius: 16px; padding: 16px; backdrop-filter: blur(8px); box-shadow: var(--shadow-soft); position: relative; z-index: 1; }
 
   .control-select{
@@ -172,10 +172,6 @@
     transition: transform .12s ease, background .12s ease, border-color .12s ease;
   }
   .dot.strong { width:16px; height:16px; }
-  .dot.double::after { /* 7/8の5拍目：弱強の目印(二重リング) */
-    content:''; display:block; width:6px; height:6px; border-radius:50%;
-    border:2px solid rgba(220,118,51,0.6); margin:2px auto 0;
-  }
   .dot.active {
     background: var(--primary);
     border-color: var(--primary-strong);
@@ -249,34 +245,20 @@
 
       <div class="divider"></div>
 
-      <!-- Time signature & subdivision -->
+      <!-- Time signature (fixed choices) -->
       <div class="section">
-        <div class="label">拍子とリズム</div>
+        <div class="label">拍子</div>
         <div class="controls-row">
-          <!-- 拍子記号はセレクト -->
           <div class="control-card" style="z-index:2">
-            <div class="label" style="margin-bottom: 8px; font-size: 12px;">拍子記号</div>
             <select id="timeSig" class="control-select" aria-label="拍子記号">
-              <option value="2/2">2/2</option>
               <option value="2/4">2/4</option>
               <option value="3/4">3/4</option>
               <option value="4/4" selected>4/4</option>
               <option value="3/8">3/8</option>
               <option value="6/8">6/8</option>
-              <option value="7/8">7/8</option>
             </select>
             <!-- 拍頭インジケーター -->
             <div id="beatIndicator" class="indicator" aria-hidden="true"></div>
-          </div>
-
-          <div class="control-card" style="z-index:2">
-            <div class="label" style="margin-bottom: 8px; font-size: 12px;">音符の種類</div>
-            <select id="subdiv" class="control-select" aria-label="細分">
-              <option value="quarter">4分音符</option>
-              <option value="eighth" selected>8分音符</option>
-              <option value="triplet">3連符</option>
-              <option value="sixteenth">16分音符</option>
-            </select>
           </div>
         </div>
       </div>
@@ -319,10 +301,9 @@
   const CONFIG = {
     defaultBpm: 100,
     defaultTimeSig: '4/4',
-    defaultSubdiv: 'eighth',
-    scheduleAheadSec: 0.14
+    scheduleAheadSec: 0.14,
+    stepsPerBeat: 2 // 細分UIを廃止 → 常に8分フィール（ダウン/裏）
   };
-  // 各楽器の標準レベル（相対値）
   const LEVELS = {
     hihatDown: 0.75,
     hihatUp:   0.50,
@@ -418,21 +399,13 @@
 
   // ==== トランスポート／状態 =====================================
   let bpmVal = CONFIG.defaultBpm;
-  let beats = 4, beatUnit = 4;       // timeSigから決定
-  let subdiv = CONFIG.defaultSubdiv;
-  let currentTimeSig = CONFIG.defaultTimeSig;
+  let beats = 4, beatUnit = 4;
   let playing=false, step=0, nextTime=0;
   const ahead = CONFIG.scheduleAheadSec;
 
-  function parseTimeSig(str){
-    const m = String(str||CONFIG.defaultTimeSig).match(/^(\d+)\s*\/\s*(\d+)$/);
-    if(!m) return [4,4];
-    return [parseInt(m[1],10), parseInt(m[2],10)];
-  }
   function secPerStep(){
     const spb = 60 / bpmVal;
-    const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
-    return spb * (4/beatUnit) / stepsPerBeat;
+    return spb * (4/beatUnit) / CONFIG.stepsPerBeat;
   }
   function secPerBeat(){
     const spb = 60 / bpmVal;
@@ -446,10 +419,7 @@
     for(let i=0;i<beats;i++){
       const d = document.createElement('span');
       d.className = 'dot';
-      // 1拍目は強
-      if(i===0) d.classList.add('strong');
-      // 7/8 の 5拍目（index 4）は “弱強” 表現のドット（ダブルマーク）
-      if(currentTimeSig==='7/8' && i===4) d.classList.add('double');
+      if(i===0) d.classList.add('strong'); // 1拍目は強拍表示
       cont.appendChild(d);
     }
   }
@@ -463,41 +433,43 @@
     lastActiveDot = beatInBar;
   }
 
-  // ==== スケジューラ（キック：4/4→1拍単発 / 3拍ダブル） =========
+  // ==== スケジューラ =============================================
   function scheduleStep(i, t){
-    const stepsPerBeat = subdiv==='quarter'?1:subdiv==='eighth'?2:subdiv==='triplet'?3:4;
+    const stepsPerBeat = CONFIG.stepsPerBeat; // 8分フィール固定
     const beatIndex = Math.floor(i/stepsPerBeat);
     const stepInBeat = i % stepsPerBeat;
     const beatInBar  = beatIndex % beats;
 
-    // Hi-Hat：通常は8分（ダウン/裏）
+    // Hi-Hat：8分（ダウン/裏）
     if (el('hihat').checked){
-      // ▼ 7/8の5拍目は「弱→強」を短間隔で（デフォのダウンを置き換える）
-      if(currentTimeSig==='7/8' && stepInBeat===0 && beatInBar===4){
-        const weak = Math.max(0.4, LEVELS.hihatUp);     // 少し弱め
-        const strong = Math.min(1.0, LEVELS.hihatDown*1.2); // その後 強め
-        playHihat(t, weak);
-        playHihat(t + secPerBeat()*0.18, strong); // ちょい後に強
-      }else{
-        const base = (stepInBeat===0) ? LEVELS.hihatDown : LEVELS.hihatUp;
-        // 1拍目はやや強調
-        const accent = (stepInBeat===0 && beatInBar===0) ? 1.15 : 1.0;
-        playHihat(t, Math.min(1, base*accent));
-      }
+      const hhLevel = (stepInBeat===0) ? LEVELS.hihatDown : LEVELS.hihatUp;
+      playHihat(t, hhLevel);
     }
 
-    // 拍頭インジケーター更新
+    // 拍頭インジケーター
     if(stepInBeat===0){ updateIndicator(beatInBar); }
 
     if (stepInBeat===0){
-      // Snare：2拍/4拍（4/4前提の基本スコア。変拍子は必要なら都度拡張）
-      if (el('snare').checked && (beatInBar===1 || beatInBar===3) && beatUnit===4 && beats===4){
-        playSnare(t, beatInBar===1 ? LEVELS.snareBeat2 : LEVELS.snareBeat4);
+      // Snare パターン
+      if (el('snare').checked){
+        if (beats===4 && beatUnit===4){
+          // 4/4：2拍目・4拍目
+          if (beatInBar===1 || beatInBar===3){
+            playSnare(t, beatInBar===1 ? LEVELS.snareBeat2 : LEVELS.snareBeat4);
+          }
+        } else if (beats===2 && beatUnit===4){
+          // 2/4：1拍目は休み、2拍目のみ
+          if (beatInBar===1){
+            playSnare(t, LEVELS.snareBeat2);
+          }
+        }
+        // 他の拍子は必要に応じて拡張可（現状はスネア無し）
       }
 
-      // Kick：4/4のとき 1拍=単発（強） / 3拍=ダブル
+      // Kick パターン
       if (el('kick').checked){
-        if (beatUnit===4 && beats===4){
+        if (beats===4 && beatUnit===4){
+          // 4/4：1拍目＝単発 / 3拍目＝ダブル
           if (beatInBar === 0){
             playKick(t, LEVELS.kickStrong);
           } else if (beatInBar === 2){
@@ -506,21 +478,19 @@
             playKick(second, 0.75);
           }
         } else {
-          // 変拍子時は拍頭で軽く支える（必要に応じて拡張可）
+          // それ以外の拍子：各拍頭を軽く支える
           playKick(t, 0.70);
         }
       }
 
-      // Tamb：バー頭
+      // Tamb, Shaker, Conga
       if (el('tamb').checked && beatInBar===0){ playTamb(t, LEVELS.tambBarHead); }
-      // Shaker：各拍頭で軽く
       if (el('shaker').checked){ playShaker(t, LEVELS.shakerBeatHead); }
-      // Conga：1拍/3拍（4/4の典型）。他拍子は拍頭のみ
       if (el('conga').checked){
         if(beats===4 && beatUnit===4){
           if(beatInBar===0 || beatInBar===2){ playConga(t, LEVELS.congaOn13); }
         }else{
-          if(stepInBeat===0){ playConga(t, 0.55); }
+          playConga(t, 0.55);
         }
       }
     }
@@ -540,23 +510,19 @@
   function start(){
     if (!ctx || ctx.state!=='running') unlockAudioNow();
     bpmVal = parseInt(el('bpm').value||String(CONFIG.defaultBpm),10);
-    currentTimeSig = el('timeSig').value || CONFIG.defaultTimeSig;
-    [beats, beatUnit] = currentTimeSig.split('/').map(n=>parseInt(n,10));
-    subdiv = (el('subdiv').value||CONFIG.defaultSubdiv);
+    const [b,u] = el('timeSig').value.split('/').map(n=>parseInt(n,10));
+    beats=b; beatUnit=u;
     buildIndicator(); // 拍数が変わるので再構築
     playing=true; step=0; nextTime=ctx.currentTime+0.05;
     scheduler();
   }
   function stop(){ playing=false; }
 
-  // === ヘルパー＆永続化 ==========================================
-  function setVolume01(v){ const x = Math.max(0, Math.min(1, +v)); el('volume').value = x; if(master) master.gain.value = x; }
-
+  // === 永続化 ====================================================
   function persist(){
     localStorage.setItem('metroSettings', JSON.stringify({
       bpm: el('bpm').value,
       timeSig: el('timeSig').value,
-      subdiv: el('subdiv').value,
       volume: el('volume').value,
       kits: {
         kick: el('kick').checked, snare: el('snare').checked, hihat: el('hihat').checked,
@@ -574,12 +540,11 @@
       } else {
         tsSel.value = CONFIG.defaultTimeSig;
       }
-      if(s.subdiv) el('subdiv').value = s.subdiv;
       if(s.volume){ el('volume').value = s.volume; if(master) master.gain.value = +s.volume; }
       if(s.kits){ for(const k in s.kits){ const c = el(k); if(c) c.checked = !!s.kits[k]; } }
       updateBpmDisplay();
-      // 初期のインジケーター
-      [beats, beatUnit] = tsSel.value.split('/').map(n=>parseInt(n,10));
+      const [b,u] = tsSel.value.split('/').map(n=>parseInt(n,10));
+      beats=b; beatUnit=u;
       buildIndicator();
       updateIndicator(-1);
     }catch(e){}
@@ -600,13 +565,13 @@
   el('bpmPlus').addEventListener('click',  ()=>{ el('bpm').value = Math.min(300, parseInt(el('bpm').value||'100',10)+1); updateBpmDisplay(); persist(); }, {passive:false});
   el('bpm').addEventListener('input', ()=>{ updateBpmDisplay(); persist(); });
 
-  ['timeSig','subdiv','volume','kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
+  ['timeSig','volume','kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
     const node = el(id); if(!node) return;
     const ev = (node.type==='checkbox') ? 'change' : (node.type==='range' ? 'input' : 'change');
     node.addEventListener(ev, ()=>{ 
       if(id==='timeSig'){ 
         const [b,u] = node.value.split('/').map(n=>parseInt(n,10));
-        beats=b; beatUnit=u; currentTimeSig=node.value; buildIndicator(); updateIndicator(-1);
+        beats=b; beatUnit=u; buildIndicator(); updateIndicator(-1);
       }
       if(id==='volume'){ if(master) master.gain.value = parseFloat(node.value||'0.7'); }
       persist();
