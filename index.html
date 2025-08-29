@@ -8,7 +8,7 @@
   :root{
     /* === カラーパレット（LPの世界観を反映：温かいオレンジ系） === */
     --primary: #DC7633;        /* メインのオレンジ */
-    --primary-strong: #C95F1D; /* 少し落ち着いた濃いオレンジ */
+    --primary-strong: #C95F1D; /* 落ち着いた濃いオレンジ */
     --primary-light: #F39C12;  /* 明るめのアクセント */
     --accent: #FFD9B3;         /* クリームがかった淡いオレンジ */
     --warm-cream: #FFF6EA;     /* 背景ベース */
@@ -245,7 +245,7 @@
 
       <div class="divider"></div>
 
-      <!-- Time signature (fixed choices) -->
+      <!-- Time signature -->
       <div class="section">
         <div class="label">拍子</div>
         <div class="controls-row">
@@ -302,7 +302,7 @@
     defaultBpm: 100,
     defaultTimeSig: '4/4',
     scheduleAheadSec: 0.14,
-    stepsPerBeat: 2 // 細分UIを廃止 → 常に8分フィール（ダウン/裏）
+    stepsPerBeat: 2 // 細分UIなし → 常に8分フィール（ダウン/裏）
   };
   const LEVELS = {
     hihatDown: 0.75,
@@ -329,6 +329,8 @@
     initAudio();
     try{ ctx.resume(); }catch(e){}
     try{ const s=ctx.createBufferSource(); s.buffer=ctx.createBuffer(1,1,ctx.sampleRate); s.connect(master); s.start(0);}catch(e){}
+    // ▼ 音量スライダー値を必ず反映（iOS初回の不一致対策）
+    try{ master.gain.value = parseFloat(el('volume').value||'0.7'); }catch(e){}
     const ov = el('unlockOverlay'); if (ctx && ctx.state==='running' && ov) ov.classList.add('hidden');
   }
 
@@ -433,6 +435,14 @@
     lastActiveDot = beatInBar;
   }
 
+  // ==== リタイミング（ライブ反映のコア） ==========================
+  function retime(offset=0.05){
+    // 先読みしているノートはキャンセルできないため、今後のスケジュールを
+    // 現在時刻からオフセットして再スタートする
+    nextTime = ctx.currentTime + offset;
+    step = 0;
+  }
+
   // ==== スケジューラ =============================================
   function scheduleStep(i, t){
     const stepsPerBeat = CONFIG.stepsPerBeat; // 8分フィール固定
@@ -459,11 +469,9 @@
           }
         } else if (beats===2 && beatUnit===4){
           // 2/4：1拍目は休み、2拍目のみ
-          if (beatInBar===1){
-            playSnare(t, LEVELS.snareBeat2);
-          }
+          if (beatInBar===1){ playSnare(t, LEVELS.snareBeat2); }
         }
-        // 他の拍子は必要に応じて拡張可（現状はスネア無し）
+        // 他拍子は必要に応じて拡張可
       }
 
       // Kick パターン
@@ -513,7 +521,7 @@
     const [b,u] = el('timeSig').value.split('/').map(n=>parseInt(n,10));
     beats=b; beatUnit=u;
     buildIndicator(); // 拍数が変わるので再構築
-    playing=true; step=0; nextTime=ctx.currentTime+0.05;
+    playing=true; retime(); // ← スケジュールを今の設定で再構築
     scheduler();
   }
   function stop(){ playing=false; }
@@ -550,7 +558,7 @@
     }catch(e){}
   }
 
-  // === イベント ===================================================
+  // === イベント（ライブ反映版） ==================================
   const unlockBtn = el('unlock');
   if (unlockBtn){
     unlockBtn.addEventListener('click', unlockAudioNow, {passive:false});
@@ -561,21 +569,39 @@
   el('start').addEventListener('click', start, {passive:false});
   el('stop').addEventListener('click', stop, {passive:false});
 
-  el('bpmMinus').addEventListener('click', ()=>{ el('bpm').value = Math.max(20, parseInt(el('bpm').value||'100',10)-1); updateBpmDisplay(); persist(); }, {passive:false});
-  el('bpmPlus').addEventListener('click',  ()=>{ el('bpm').value = Math.min(300, parseInt(el('bpm').value||'100',10)+1); updateBpmDisplay(); persist(); }, {passive:false});
-  el('bpm').addEventListener('input', ()=>{ updateBpmDisplay(); persist(); });
+  // BPMボタン & 入力：再生中は即リタイミング
+  el('bpmMinus').addEventListener('click', ()=>{
+    el('bpm').value = Math.max(20, parseInt(el('bpm').value||'100',10)-1);
+    updateBpmDisplay(); persist();
+    if(playing){ bpmVal = parseInt(el('bpm').value,10); retime(); }
+  }, {passive:false});
+  el('bpmPlus').addEventListener('click',  ()=>{
+    el('bpm').value = Math.min(300, parseInt(el('bpm').value||'100',10)+1);
+    updateBpmDisplay(); persist();
+    if(playing){ bpmVal = parseInt(el('bpm').value,10); retime(); }
+  }, {passive:false});
+  el('bpm').addEventListener('input', ()=>{
+    updateBpmDisplay(); persist();
+    if(playing){ bpmVal = parseInt(el('bpm').value||'100',10); retime(0.02); }
+  });
 
-  ['timeSig','volume','kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
+  // 拍子：再生中は即インジケータ再構築＆リタイミング
+  el('timeSig').addEventListener('change', (e)=>{
+    const [b,u] = e.target.value.split('/').map(n=>parseInt(n,10));
+    beats=b; beatUnit=u; buildIndicator(); updateIndicator(-1); persist();
+    if(playing){ retime(); }
+  });
+
+  // 音量：スライダーの動きに合わせて即反映（input & change の両方）
+  const vol = el('volume');
+  const applyVolume = ()=>{ if(master) master.gain.value = parseFloat(vol.value||'0.7'); persist(); };
+  vol.addEventListener('input', applyVolume, {passive:true});
+  vol.addEventListener('change', applyVolume, {passive:true});
+
+  // 楽器ON/OFF：即時反映（次スケジュールから）
+  ['kick','snare','hihat','tamb','shaker','conga'].forEach(id=>{
     const node = el(id); if(!node) return;
-    const ev = (node.type==='checkbox') ? 'change' : (node.type==='range' ? 'input' : 'change');
-    node.addEventListener(ev, ()=>{ 
-      if(id==='timeSig'){ 
-        const [b,u] = node.value.split('/').map(n=>parseInt(n,10));
-        beats=b; beatUnit=u; buildIndicator(); updateIndicator(-1);
-      }
-      if(id==='volume'){ if(master) master.gain.value = parseFloat(node.value||'0.7'); }
-      persist();
-    }, {passive:true});
+    node.addEventListener('change', persist, {passive:true});
   });
 
   // 初期表示
